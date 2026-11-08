@@ -186,9 +186,9 @@ export const EXH_PRESETS = { stock: 1, sport: 0.5, open: 0.12 };
 export const exhaustOpen = (P) => (P.muffler === false ? 1 : 1 - (P.baffle ?? 1));
 
 const COMMON = {
-  exhaust: 'stock',     // atalho escolhido: 'stock' | 'sport' | 'open' | 'custom'
+  exhaust: 'sport',     // atalho escolhido: 'stock' | 'sport' | 'open' | 'custom'
   muffler: true,        // com silencioso
-  baffle: 1,            // abafamento do silencioso (0–1)
+  baffle: 0.5,          // abafamento do silencioso (0–1)
   pipeLen: 1,           // comprimento dos tubos (multiplicador)
   flap: 'auto',         // válvula do escape (4 em linha): 'auto' | 'open' | 'closed'
   mode: 'road',
@@ -197,7 +197,7 @@ const COMMON = {
   fuel: 1,              // multiplicador da injeção (λ = alvo ÷ fuel)
   knockCtl: true,       // sensor de detonação
   dtc: true,            // controle de tração
-  anim: 'slow',         // 'slow' | 'real'
+  anim: 'real',         // 'slow' | 'real'
   shake: true,          // vibração do motor no desenho
   failSpark: 0,         // cilindro com vela falhando (0 = nenhum)
   failFilter: false,    // filtro de ar entupido

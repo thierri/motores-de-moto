@@ -37,7 +37,7 @@ class App {
     if (VIDEO) this.stage.classList.add('video');
     const q = qs.get('motor');
     this.Ps = { i4: clone(DEFAULTS_BY.i4), v2: clone(DEFAULTS_BY.v2), cg: clone(DEFAULTS_BY.cg) };
-    this.P = this.Ps[q === 'v2' || q === 'harley' ? 'v2' : q === 'cg' ? 'cg' : 'i4'];
+    this.P = this.Ps[q === 'v2' || q === 'harley' ? 'v2' : q === 'i4' || q === 'bmw' || q === 's1000' ? 'i4' : 'cg'];
     this.st = createState(this.P);
     this.acc = 0;
     this.pres = { active: false };
@@ -99,9 +99,9 @@ class App {
     tb.innerHTML = `
       <div class="brand"><b id="brandT"></b><span id="brandS"></span></div>
       <div class="engsel" id="engSel" data-spot="engine">
-        <button data-v="i4">${ICON.sport}<span>4 em linha</span></button>
-        <button data-v="v2">${ICON.cruiser}<span>V-Twin</span></button>
-        <button data-v="cg">${ICON.street}<span>CG 125</span></button>
+        <button data-v="cg">${ICON.street}<span>CG125</span></button>
+        <button data-v="v2">${ICON.cruiser}<span>Harley Davidson</span></button>
+        <button data-v="i4">${ICON.sport}<span>BMW S1000</span></button>
       </div>
       <div class="sp"></div>
       <div class="legend">
@@ -177,7 +177,10 @@ class App {
   }
 
   // ---------- ações do piloto ----------
-  setKey(on) { this.st.key = on; }
+  setKey(on) {
+    this.st.key = on;
+    if (on) document.getElementById('btnKey')?.classList.remove('hint');   // já achou a chave: para de piscar
+  }
   setRun(on) { this.st.run = on; }
   shift(dir) { shift(this.st, this.P, dir); }
   kick() { kick(this.st, this.P); }

@@ -26,6 +26,8 @@ build. Concepção em `concepcao.md`.
 - **Animação em câmera lenta**: o desenho usa um ângulo visual próprio (`st.vis`), nunca o ângulo real.
 - **Modo vídeo determinístico** (`?video`): sem requestAnimationFrame, `Math.random` com semente,
   transições desligadas, som com `sound.clock`. O worklet tem gerador aleatório próprio com semente.
-- Marcas: sem logos da BMW, Harley-Davidson ou Honda; "inspirado na …" é o máximo.
+- Marcas: sem logos da BMW, Harley-Davidson ou Honda. Só os botões do seletor usam os nomes (CG125, Harley
+  Davidson, BMW S1000), a pedido; no resto, "inspirado na …".
+- Ao abrir: CG 125, escape esportivo, desenho em tempo real e a chave piscando até ser ligada.
 - Servidor local: `python3 -m http.server 8765` rodado pelo terminal (o macOS bloqueia a pasta Desktop
   para processos iniciados pelo app). Para evitar cache de módulos: `python3 tools/serve.py` (porta 8781).

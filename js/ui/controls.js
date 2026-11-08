@@ -3,6 +3,8 @@
 // O roteiro da apresentação pode escrever em `script` (sobrepõe o usuário).
 import { MODES, profile } from '../config.js';
 
+const CL_HOLD = 1.5;   // segundos que a embreagem fica puxada depois de soltar o botão
+
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 export class Controls {
@@ -20,7 +22,7 @@ export class Controls {
     this.pad = null;
     root.innerHTML = `
       <div class="cgrp ign" data-spot="ign">
-        <div class="cb"><button class="key" id="btnKey" aria-label="Chave"><span class="kh"></span></button><label>Chave <kbd>I</kbd></label></div>
+        <div class="cb"><button class="key${app.video ? '' : ' hint'}" id="btnKey" aria-label="Chave"><span class="kh"></span></button><label>Chave <kbd>I</kbd></label></div>
         <div class="cb"><button class="kill" id="btnKill" aria-label="Corta-corrente"><span>RUN</span></button><label>Corta-corrente <kbd>K</kbd></label></div>
         <div class="cb"><button class="startb" id="btnStart" aria-label="Partida"><span>START</span></button><label id="startL">Partida <kbd>Enter</kbd></label></div>
         <div class="cb chokecb" id="chokeCb"><button class="chokeb" id="btnChoke" aria-label="Afogador"><span>AFOG.</span></button><label>Afogador <kbd>A</kbd></label></div>
@@ -138,7 +140,7 @@ export class Controls {
     this.pad = cur;
   }
 
-  resetFx() { this.grip = 0; this.clutch = 0; this.brake = 0; }
+  resetFx() { this.grip = 0; this.clutch = 0; this.brake = 0; this.clHold = 0; }
 
   // escreve os comandos no estado
   apply(st, P, dt) {
@@ -155,8 +157,12 @@ export class Controls {
     const rate = target > this.grip ? 1 / 0.05 : 1 / 0.07;
     this.grip += clamp(target - this.grip, -rate * dt, rate * dt);
     st.input.grip = this.grip;
-    // embreagem: puxa rápido, solta progressivamente (dá para sair com a moto)
-    let cl = this.user.clutch || this.kb.clutch || pad.x ? 1 : 0;
+    // embreagem: puxa rápido, solta progressivamente (dá para sair com a moto).
+    // O botão na tela segura a embreagem por mais 1,5 s depois de solto: no celular dá para tocar na
+    // embreagem, tirar o dedo e ainda trocar a marcha com ela puxada.
+    if (this.user.clutch) this.clHold = CL_HOLD;
+    else this.clHold = Math.max(0, (this.clHold || 0) - dt);
+    let cl = this.user.clutch || this.clHold > 0 || this.kb.clutch || pad.x ? 1 : 0;
     if (s && s.clutch != null) cl = s.clutch;
     this.clutch = cl > this.clutch ? Math.min(cl, this.clutch + dt / 0.08) : Math.max(cl, this.clutch - dt / 0.7);
     st.input.clutch = this.clutch;
@@ -180,6 +186,9 @@ export class Controls {
     e.gv.textContent = `${Math.round(g * 100)}% · borboleta ${Math.round(st.tps * 100)}%`;
     e.gear.textContent = st.gear === 0 ? 'N' : `${st.gear}ª`;
     e.clutch.classList.toggle('on', st.input.clutch > 0.5);
+    // barra que esvazia enquanto a embreagem ainda está segura depois de soltar o botão
+    const hk = !this.user.clutch && this.clHold > 0 ? this.clHold / CL_HOLD : 0;
+    e.clutch.style.setProperty('--hk', hk.toFixed(3));
     e.brake.classList.toggle('on', st.input.brake > 0.5);
     const E = profile(P);
     if (this.eng !== P.engine) {
