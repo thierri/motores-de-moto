@@ -97,7 +97,8 @@ export class Panel {
     const a = this.an = { vs: 0, vr: 0 };
     const defs = el('defs', {}, svg);
     const chrome = el('linearGradient', { id: 'chrome', x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
-    [['0', '#f4f7fa'], ['0.45', '#8d96a1'], ['0.55', '#5d6670'], ['1', '#dfe5ea']].forEach(([o, c]) => el('stop', { offset: o, 'stop-color': c }, chrome));
+    const classic = E.cluster === 'classic';
+    (classic ? [['0', '#3a3d42'], ['1', '#15171a']] : [['0', '#f4f7fa'], ['0.45', '#8d96a1'], ['0.55', '#5d6670'], ['1', '#dfe5ea']]).forEach(([o, c]) => el('stop', { offset: o, 'stop-color': c }, chrome));
     const face = el('radialGradient', { id: 'face', cx: '50%', cy: '40%', r: '65%' }, defs);
     [['0', '#23272d'], ['1', '#07080a']].forEach(([o, c]) => el('stop', { offset: o, 'stop-color': c }, face));
     el('rect', { x: 0, y: 0, width: 496, height: 178, rx: 10, fill: '#0a0b0d' }, svg);
@@ -126,8 +127,9 @@ export class Panel {
       el('path', { d: `M${cx - 2.5} ${cy + 14} L${cx - 1.2} ${cy - R + 12} L${cx + 1.2} ${cy - R + 12} L${cx + 2.5} ${cy + 14} Z`, fill: '#ff5a1f' }, needle);
       return { cx, cy, R, needle, max };
     };
-    a.sp = dial(150, 92, 80, 220, 10, 20, (v) => `${v}`, null);
-    a.tc = dial(372, 96, 62, 7, 0.5, 1, (v) => `${v}`, E.limit / 1000);
+    const sm = E.speedMax || 220, tm = Math.round(E.rpmMax / 1000);
+    a.sp = dial(150, 92, 80, sm, sm > 150 ? 10 : 5, sm > 150 ? 20 : 10, (v) => `${v}`, null);
+    a.tc = dial(372, 96, 62, tm, tm > 8 ? 1 : 0.5, tm > 8 ? 2 : 1, (v) => `${v}`, E.limit / 1000);
     txt(svg, 150, 62, 'km/h', { 'font-size': 10, fill: '#9aa3ad', 'text-anchor': 'middle' });
     txt(svg, 372, 74, 'x1000 rpm', { 'font-size': 9, fill: '#9aa3ad', 'text-anchor': 'middle' });
     // visores digitais (âmbar)
@@ -154,7 +156,7 @@ export class Panel {
     if (on && !this.anWasOn) this.anSweep = 1.2;
     this.anWasOn = on;
     let ts = st.v * 3.6, tr = st.rpm / 1000;
-    if (this.anSweep > 0) { this.anSweep -= dt; const u = this.anSweep > 0.6 ? 1 : this.anSweep / 0.6; ts = Math.max(ts, 220 * u); tr = Math.max(tr, 7 * u); }
+    if (this.anSweep > 0) { this.anSweep -= dt; const u = this.anSweep > 0.6 ? 1 : this.anSweep / 0.6; ts = Math.max(ts, a.sp.max * u); tr = Math.max(tr, a.tc.max * u); }
     a.vs += (ts - a.vs) * k; a.vr += (tr - a.vr) * k;
     const rot = (d, v) => d.needle.setAttribute('transform', `rotate(${(-135 + 270 * Math.max(0, Math.min(1.02, v / d.max))).toFixed(2)} ${d.cx} ${d.cy})`);
     rot(a.sp, a.vs); rot(a.tc, a.vr);
@@ -175,7 +177,7 @@ export class Panel {
   buildDyno(svg, E) {
     svg.innerHTML = '';
     const RMAX = E.rpmMax;
-    const d = this.d = { x0: 40, x1: 456, y0: 146, y1: 10, kwTop: E.cyl === 2 ? 120 : 240, tTop: E.cyl === 2 ? 180 : 140, RMAX };
+    const d = this.d = { x0: 40, x1: 456, y0: 146, y1: 10, kwTop: E.dyno.cv, tTop: E.dyno.nm, RMAX };
     d.gx = (r) => d.x0 + (r / RMAX) * (d.x1 - d.x0);
     d.gp = (c) => d.y0 - (c / d.kwTop) * (d.y0 - d.y1);
     d.gt = (t) => d.y0 - (t / d.tTop) * (d.y0 - d.y1);
@@ -184,7 +186,7 @@ export class Panel {
       txt(svg, d.x0 - 6, d.gp(c) + 4, `${c}`, { 'font-size': 11, fill: '#f08a2c', 'text-anchor': 'end' });
       txt(svg, d.x1 + 6, d.gp(c) + 4, `${Math.round(c / d.kwTop * d.tTop)}`, { 'font-size': 11, fill: '#4fa3ff' });
     }
-    for (let r = 0; r <= RMAX / 1000; r += RMAX > 10000 ? 2 : 1) {
+    for (let r = 0; r <= RMAX / 1000; r += RMAX > 12000 ? 2 : 1) {
       el('line', { x1: d.gx(r * 1000), y1: d.y0, x2: d.gx(r * 1000), y2: d.y1, stroke: '#fff', 'stroke-opacity': 0.05 }, svg);
       txt(svg, d.gx(r * 1000), d.y0 + 15, `${r}k`, { 'font-size': 11, fill: '#8da0b6', 'text-anchor': 'middle' });
     }
@@ -246,7 +248,7 @@ export class Panel {
     const E = profile(P);
     if (this.engine !== P.engine) {
       this.engine = P.engine;
-      this.analog = E.cyl === 2;
+      this.analog = E.cluster !== 'tft';
       if (this.analog) this.buildAnalog(this.tftSvg, E); else this.buildTft(this.tftSvg, E);
       this.tftSvg.parentNode.classList.toggle('analog', this.analog);
       this.buildDyno(this.dynoSvg, E);

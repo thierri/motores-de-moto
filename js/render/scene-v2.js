@@ -8,7 +8,8 @@
 import { el, txt, attr, gasColor, tempColor, fmt, fmtInt } from './svg.js';
 import { ENGINES } from '../config.js';
 import { cylPressure, intakeLift, exhaustLift, strokeOf } from '../sim/engine.js';
-import { drawMuffler, mufKey } from './exhaust-common.js';
+import { drawMuffler, mufKey, ExhaustPlume } from './exhaust-common.js';
+import { wrapShake } from './shake.js';
 
 const E = ENGINES.v2;
 const D2R = Math.PI / 180;
@@ -155,8 +156,9 @@ export class V2View {
     m.vMap = vt(tb.x, tb.y + 52);
     m.vEgt = vt(84, C.y + 70);
 
-    this.buildRhythm(el('g', {}, g));
-    this.buildExhaust(el('g', { transform: 'translate(-240 0)' }, g));
+    this.buildRhythm(el('g', { class: 'noshake' }, g));
+    this.buildExhaust(el('g', { transform: 'translate(-240 0)', class: 'noshake' }, g));
+    this.sh = wrapShake(g);
   }
 
   buildCyl(g, i) {
@@ -295,14 +297,14 @@ export class V2View {
     txt(gg, 1070, 596, 'T', { 'font-size': 12, 'font-weight': 700, fill: '#aebdcc', 'text-anchor': 'middle' });
     e.muf = [el('g', { 'data-comp': 'muffler' }, gg), el('g', { 'data-comp': 'muffler' }, gg)];
     e.pulses = [0, 1].map(() => el('circle', { r: 0, fill: '#fff2c4', filter: 'url(#glow)', 'pointer-events': 'none' }, gg));
-    e.waves = el('g', { 'pointer-events': 'none' }, gg);
+    e.plume = new ExhaustPlume(gg, 50);
     e.kind = null;
-    e.wv = []; e.wt = 0;
   }
 
   // ======================================================================
   update(st, P, dt) {
     const m = this.m;
+    this.scene.vib.apply(this.sh, C.x, C.y);
     const theta = st.vis.theta;
     const off = E.firing.v45;
     const running = st.running && !st.broken;
@@ -419,7 +421,7 @@ export class V2View {
       e.muf.forEach((m) => m.setAttribute('transform', `translate(0 0)`));
       e.tail = g0.tail;
     }
-    e.name.textContent = P.muffler === false ? 'drag pipes: tubos retos, sem silencioso' : P.baffle > 0.75 ? 'silenciosos originais (2 em 2 com cruzamento)' : P.baffle > 0.3 ? 'ponteiras esportivas' : 'ponteiras abertas, quase sem miolo';
+    e.name.textContent = P.muffler === false ? 'drag pipes (sem silencioso)' : P.baffle > 0.75 ? 'silenciosos originais' : P.baffle > 0.3 ? 'ponteiras esportivas' : 'ponteiras abertas';
     e.core.forEach((c) => c.setAttribute('stroke', ec));
     for (let i = 0; i < 2; i++) {
       const th = local[i];
@@ -432,16 +434,7 @@ export class V2View {
         attr(c, { cx: pt.x.toFixed(1), cy: pt.y.toFixed(1), r: (strong ? 7 + 3 * st.pr : 4) * (1 - 0.4 * u), 'fill-opacity': strong ? 0.95 : 0.4 });
       } else c.setAttribute('r', 0);
     }
-    const loud = running ? Math.min(1, 0.4 + st.pr * 0.5) * (0.8 + 0.4 * (P.muffler === false ? 1.2 : 1 - P.baffle)) : 0;
-    e.wt += dt * (0.8 + vr / 60);
-    if (loud > 0 && e.wt > 0.35) { e.wt = 0; e.wv.push({ r: 4, a: loud }); if (e.wv.length > 5) e.wv.shift(); }
-    while (e.waves.childNodes.length < e.wv.length) el('path', { fill: 'none', stroke: '#9fd0ff', 'stroke-width': 1.5 }, e.waves);
-    e.wv.forEach((w, k) => {
-      w.r += dt * 36; w.a *= Math.exp(-dt * 1.4);
-      const n = e.waves.childNodes[k], ty = 721;
-      n.setAttribute('d', `M${e.tail + w.r * 0.4} ${ty - w.r} A${w.r} ${w.r} 0 0 1 ${e.tail + w.r * 0.4} ${ty + w.r}`);
-      n.setAttribute('stroke-opacity', Math.max(0, w.a * (1 - w.r / 40)).toFixed(2));
-    });
-    for (let k = e.wv.length; k < e.waves.childNodes.length; k++) e.waves.childNodes[k].setAttribute('stroke-opacity', 0);
+    e.plume.setTails([{ x: e.tail, y: 700 }, { x: e.tail, y: 742 }]);
+    e.plume.update(st, P, dt);
   }
 }

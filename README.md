@@ -1,10 +1,12 @@
-# Simulador de motores de moto: 4 em linha e V-Twin
+# Simulador de motores de moto: 4 em linha, V-Twin e CG 125
 
-Simulador interativo com dois motores, escolhidos na barra de cima:
+Simulador interativo com três motores, escolhidos na barra de cima:
 
 - **4 em linha** (superbike, inspirado na S1000RR): 999 cc, 16 válvulas, ~210 cv a 14.000 rpm, corte em 14.600.
 - **V-Twin 45°** (inspirado no Harley-Davidson Milwaukee-Eight 114): 1.868 cc, varetas, 155 Nm a 3.250 rpm,
   ~95 cv, explosões desiguais (315° / 405°) que dão o "batata-batata".
+- **CG 125** (inspirado na Honda CG 125 clássica): monocilíndrico de 124 cc, varetas, carburador, ~11 cv,
+  pedal de partida e afogador. `?motor=cg` abre direto nela.
 
 Som 100% sintetizado a partir da física. HTML + SVG + JS puro, sem build. `?motor=v2` abre direto no V-Twin.
 Funciona no computador (16:9) e no celular em pé (9:16, escolhido sozinho; `?fmt=916` força, tecla F alterna).
@@ -24,7 +26,8 @@ Abra http://localhost:8781 e clique uma vez para liberar o som (fone de ouvido a
 | Ação | Teclado | Controle |
 |---|---|---|
 | Chave | I | Y |
-| Partida (segurar) | Enter | A |
+| Partida (segurar) · na CG, uma pedalada por toque | Enter | A |
+| Afogador (CG) | A | — |
 | Corta-corrente | K | — |
 | Acelerar aos poucos / tudo | ↑ ou W / Espaço | gatilho direito |
 | Manter a posição do acelerador | L (ou roda do mouse na manopla) | — |
@@ -47,6 +50,7 @@ js/audio/sound.js       grafo Web Audio, partida, bomba, câmbio, vento, eventos
 js/audio/offline.js     grava o som offline em WAV (tools/out/) para análise
 js/render/scene.js      desenho do 4 em linha (4 cilindros, corte de um cilindro, escape) e roda do ciclo
 js/render/scene-v2.js   desenho do V-Twin (corte lateral, varetas, ritmo dos pulsos, escapamento)
+js/render/scene-cg.js   desenho da CG 125 (corte lateral, varetas, pedal, carburador por dentro)
 js/render/panel.js      painel TFT, números, dinamômetro, pressão no cilindro, luzes
 js/ui/                  comandos, textos das peças, gaveta de parâmetros
 tools/testsim.mjs       testes da física: node tools/testsim.mjs [i4|v2]

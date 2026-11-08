@@ -6,6 +6,7 @@ import { profile, EXH_PRESETS, MODES } from '../config.js';
 const RANGES = {
   i4: { limit: [10000, 17500, 100], idle: [900, 2500, 50], cr: [10, 15, 0.1] },
   v2: { limit: [4000, 7200, 50], idle: [600, 1400, 25], cr: [8.5, 12.5, 0.1] },
+  cg: { limit: [7000, 11500, 50], idle: [900, 2200, 25], cr: [7.5, 11.5, 0.1] },
 };
 
 export class Params {
@@ -49,9 +50,16 @@ export class Params {
       <div class="prow"><span>Controle de tração</span><button class="sw b" id="pDtc"></button></div>
       <div class="prow"><span>Quickshifter</span><button class="sw b" id="pQs"></button>
         <small>Corta a ignição por ~55 ms para subir marcha sem embreagem e dá um "blip" no acelerador para reduzir.</small></div>
+      <h4>Camadas do desenho</h4>
+      <div class="prow"><span>Cores (pressão e temperatura)</span><button class="sw b" id="lyGas"></button></div>
+      <div class="prow"><span>Fluxo (tracinhos andando)</span><button class="sw b" id="lyFlow"></button></div>
+      <div class="prow"><span>Nomes das peças</span><button class="sw b" id="lyLabels"></button></div>
+      <div class="prow"><span>Valores</span><button class="sw b" id="lyValues"></button></div>
       <h4>Animação</h4>
       <div class="prow"><span>Velocidade do desenho</span><div class="seg" id="pAnim"><button data-v="slow">Câmera lenta</button><button data-v="real">Tempo real</button></div>
         <small>O som é sempre em tempo real. Em tempo real o desenho vira um efeito estroboscópico.</small></div>
+      <div class="prow"><span>Vibração do motor</span><button class="sw b" id="pShake"></button>
+        <small>O desenho treme como o motor de verdade: o V-Twin sacode na lenta, o 4 em linha zune em giro alto.</small></div>
       <h4>Falhas</h4>
       <div class="prow"><span>Vela falhando</span><div class="seg" id="pSpark"></div>
         <small id="pSparkS"></small></div>
@@ -76,7 +84,10 @@ export class Params {
     const rng = (id, key) => $(id).addEventListener('input', (e) => { app.P[key] = +e.target.value; this.sync(); });
     rng('#pLim', 'limit'); rng('#pIdle', 'idle'); rng('#pIn', 'inertia'); rng('#pCr', 'cr'); rng('#pAdv', 'advance'); rng('#pFuel', 'fuel');
     const sw = (id, key) => $(id).addEventListener('click', () => { app.P[key] = !app.P[key]; this.sync(); });
-    sw('#pKnock', 'knockCtl'); sw('#pDtc', 'dtc'); sw('#pQs', 'qs'); sw('#pFilter', 'failFilter');
+    sw('#pKnock', 'knockCtl'); sw('#pShake', 'shake'); sw('#pDtc', 'dtc'); sw('#pQs', 'qs'); sw('#pFilter', 'failFilter');
+    for (const [id, k] of [['#lyGas', 'gas'], ['#lyFlow', 'flow'], ['#lyLabels', 'labels'], ['#lyValues', 'values']]) {
+      $(id).addEventListener('click', () => app.setLayers({ [k]: !app.scene.layers[k] }));
+    }
     $('#pReset').addEventListener('click', () => app.reset());
     $('#pDefaults').addEventListener('click', () => app.defaults());
   }
@@ -88,10 +99,10 @@ export class Params {
       $('#rowCrank').style.display = P.engine === 'i4' ? '' : 'none';
       $('#rowCam').style.display = E.shiftCam ? '' : 'none';
       for (const [id, k] of [['#pLim', 'limit'], ['#pIdle', 'idle'], ['#pCr', 'cr']]) { const el = $(id); el.min = R[k][0]; el.max = R[k][1]; el.step = R[k][2]; }
-      $('#pSpark').innerHTML = `<button data-v="0">Nenhuma</button>` + E.cylNames.map((n, i) => `<button data-v="${i + 1}">${E.cyl === 2 ? (i ? 'Traseiro' : 'Dianteiro') : n}</button>`).join('');
+      $('#pSpark').innerHTML = `<button data-v="0">Nenhuma</button>` + E.cylNames.map((n, i) => `<button data-v="${i + 1}">${E.cyl === 2 ? (i ? 'Traseiro' : 'Dianteiro') : E.cyl === 1 ? 'Falhando' : n}</button>`).join('');
       $('#pExh').querySelectorAll('button').forEach((b) => (b.textContent = E.exhausts[b.dataset.v]));
       $('#pLimS').textContent = `Acima de ${fmtInt(E.float)} rpm as molas não seguram as válvulas (flutuação). Acima de ${fmtInt(E.breakRpm)} a válvula bate no pistão.`;
-      $('#pSparkS').textContent = E.cyl === 2 ? 'Um cilindro sem faísca: o V-Twin perde metade da força e vira um monocilíndrico manco.' : 'Um cilindro sem faísca: o motor perde um quarto da força e o som fica manco.';
+      $('#pSparkS').textContent = E.cyl === 1 ? 'Sem faísca no único cilindro, o motor simplesmente não pega.' : E.cyl === 2 ? 'Um cilindro sem faísca: o V-Twin perde metade da força e vira um monocilíndrico manco.' : 'Um cilindro sem faísca: o motor perde um quarto da força e o som fica manco.';
       $('#pMufS').textContent = E.cyl === 2 ? 'Desligado: drag pipes, tubos retos sem silencioso. O ronco mais alto e os pipocos mais fortes.' : 'Desligado: tubo direto, sem silencioso. Muito alto e cheio de estalos.';
       $('#rowFlap').style.display = E.cyl === 4 ? '' : 'none';
     }
@@ -111,5 +122,8 @@ export class Params {
     $('#pDtc').classList.toggle('on', P.dtc);
     $('#pQs').classList.toggle('on', P.qs);
     $('#pFilter').classList.toggle('on', P.failFilter);
+    $('#pShake').classList.toggle('on', P.shake !== false);
+    const ly = this.app.scene ? this.app.scene.layers : {};
+    for (const [id, k] of [['#lyGas', 'gas'], ['#lyFlow', 'flow'], ['#lyLabels', 'labels'], ['#lyValues', 'values']]) $(id).classList.toggle('on', ly[k] !== false);
   }
 }

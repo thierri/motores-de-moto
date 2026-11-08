@@ -8,7 +8,9 @@ import { el, txt, attr, gasColor, tempColor, pColor, fmt, fmtInt } from './svg.j
 import { ENGINES, profile } from '../config.js';
 import { cylPressure, intakeLift, exhaustLift, strokeOf } from '../sim/engine.js';
 import { V2View } from './scene-v2.js';
-import { drawMuffler, mufKey, ExhaustInfo, flapOpen } from './exhaust-common.js';
+import { CGView } from './scene-cg.js';
+import { drawMuffler, mufKey, ExhaustInfo, ExhaustPlume, flapOpen } from './exhaust-common.js';
+import { wrapShake, Vibration } from './shake.js';
 
 const ENG = ENGINES.i4, VALVES = ENG.valve;
 
@@ -75,7 +77,7 @@ export class Scene {
   }
   setTab(tab) { this.tab = tab; this.applyView(); }
   applyView() {
-    const v2 = this.engine === 'v2';
+    const v2 = this.engine !== 'i4';
     const VIEWS = {
       motor: v2 ? '0 0 702 784' : '0 10 702 700',
       dentro: '702 0 698 534',
@@ -95,6 +97,8 @@ export class Scene {
   }
 
   resetFx() {
+    if (this.vib) this.vib.reset();
+    if (this.e && this.e.plume) this.e.plume.reset();
     this.flowIn = 0; this.flowEx = 0; this.chain = 0; this.oilPh = 0; this.waves = []; this.waveT = 0; this.lastTheta = null;
   }
 
@@ -140,12 +144,18 @@ export class Scene {
     el('line', { x1: 716, y1: 534, x2: 1390, y2: 534, stroke: '#ffffff', 'stroke-opacity': 0.06 }, svg);
 
     this.gI4 = el('g', {}, svg);
-    this.buildFront(el('g', {}, this.gI4));
-    this.buildSection(el('g', {}, this.gI4));
+    const gf = el('g', {}, this.gI4), gs = el('g', {}, this.gI4);
+    this.buildFront(gf);
+    this.buildSection(gs);
+    this.shF = wrapShake(gf);
+    this.shS = wrapShake(gs);
+    this.vib = new Vibration();
     this.buildExhaust(el('g', { transform: 'translate(-240 0)' }, this.gI4));
-    this.exInfo = new ExhaustInfo(svg, 1176, 552, 212);
+    this.exInfo = new ExhaustInfo(svg, 1034, 548, 354);
     this.gV2 = el('g', {}, svg);
     this.v2 = new V2View(this, this.gV2);
+    this.gCG = el('g', {}, svg);
+    this.cg = new CGView(this, this.gCG);
     for (const c of svg.children) if (c.tagName !== 'defs') c.setAttribute('clip-path', 'url(#viewClip)');
     this.engine = null;
   }
@@ -279,7 +289,7 @@ export class Scene {
     s.title = txt(g, 724, 40, '', { 'font-size': 20, 'font-weight': 700, fill: '#e6edf3' });
     s.sub = txt(g, 724, 64, 'Corte transversal', { 'font-size': 14, fill: '#8da0b6' });
     txt(g, 724, 82, 'admissão ← · → escape', { 'font-size': 13, fill: '#6f8297' });
-    s.strokeR = el('rect', { x: 1220, y: 22, width: 166, height: 34, rx: 17 }, g);
+    s.strokeR = el('rect', { x: 1220, y: 22, width: 166, height: 34, rx: 17, class: 'noshake' }, g);
     s.strokeT = txt(g, 1303, 45, '', { 'font-size': 17, 'font-weight': 800, fill: '#0b1118', 'text-anchor': 'middle' });
 
     // cabeçote
@@ -428,7 +438,7 @@ export class Scene {
     e.meas = e.paths.map((d) => el('path', { d, fill: 'none', stroke: 'none' }, gg));
     xs.forEach((x, i) => txt(gg, x, yTop - 8, `${i + 1}`, { 'font-size': 12, 'font-weight': 700, fill: '#aebdcc', 'text-anchor': 'middle' }));
     e.muf = el('g', { 'data-comp': 'muffler' }, gg);
-    e.waves = el('g', { 'pointer-events': 'none' }, gg);
+    e.plume = new ExhaustPlume(gg);
     e.pulseG = el('g', { 'pointer-events': 'none' }, gg);
     for (let i = 0; i < 4; i++) e.pulses.push(el('circle', { r: 0, fill: '#fff2c4', filter: 'url(#glow)' }, e.pulseG));
     e.kind = null;
@@ -441,12 +451,17 @@ export class Scene {
       this.engine = P.engine;
       this.gI4.style.display = P.engine === 'i4' ? '' : 'none';
       this.gV2.style.display = P.engine === 'v2' ? '' : 'none';
+      this.gCG.style.display = P.engine === 'cg' ? '' : 'none';
       if (this.cyl >= E.cyl) this.cyl = 0;
       this.lastTheta = null;
       this.applyView();
     }
     this.exInfo.update(st, P, dt);
+    this.vib.update(st, P, dt);
     if (P.engine === 'v2') { this.v2.update(st, P, dt); return; }
+    if (P.engine === 'cg') { this.cg.update(st, P, dt); return; }
+    this.vib.apply(this.shF, (F.x[1] + F.x[2]) / 2, F.yc);
+    this.vib.apply(this.shS, T.x0, T.yc, 1.15);
 
     const theta = st.vis.theta;
     const off = E.firing[P.crank];
@@ -596,7 +611,7 @@ export class Scene {
     const e = this.e;
     const E = profile(P);
     if (e.kind !== mufKey(P)) { e.kind = mufKey(P); Object.assign(e, drawMuffler(e.muf, P, 1230, 742, true)); }
-    e.mufName.textContent = P.muffler === false ? 'sem silencioso: tubo direto' : P.baffle > 0.75 ? 'silencioso original com válvula' : P.baffle > 0.3 ? 'ponteira esportiva' : 'ponteira aberta, quase sem miolo';
+    e.mufName.textContent = P.muffler === false ? 'sem silencioso' : P.baffle > 0.75 ? 'silencioso original' : P.baffle > 0.3 ? 'ponteira esportiva' : 'ponteira aberta';
     const col = tempColor(st.temp.egt, 20, 1000);
     e.core.forEach((c) => c.setAttribute('stroke', col));
     // pulso de cada cilindro: nasce na abertura do escape e corre pelo tubo
@@ -613,23 +628,9 @@ export class Scene {
       } else c.setAttribute('r', 0);
     }
     if (e.flap) e.flap.setAttribute('transform', `rotate(${flapOpen(st, P, E) ? 80 : 0} ${e.flapX} 742)`);
-    // ondas de som saindo da ponteira
-    const loud = running ? Math.min(1, 0.25 + st.pr * 0.5 + st.rpm / 30000) * (0.8 + 0.4 * (P.muffler === false ? 1.2 : 1 - P.baffle)) : 0;
-    this.waveT += dt * (0.8 + st.vis.rpm / 120);
-    if (loud > 0 && this.waveT > 0.35) {
-      this.waveT = 0;
-      this.waves.push({ r: 4, a: loud });
-      if (this.waves.length > 5) this.waves.shift();
-    }
-    while (e.waves.childNodes.length < this.waves.length) el('path', { fill: 'none', stroke: '#9fd0ff', 'stroke-width': 1.5 }, e.waves);
-    const tx = e.tail, ty = 742;
-    this.waves.forEach((w, k) => {
-      w.r += dt * 40; w.a *= Math.exp(-dt * 1.4);
-      const n = e.waves.childNodes[k];
-      n.setAttribute('d', `M${tx + w.r * 0.5} ${ty - w.r} A${w.r} ${w.r} 0 0 1 ${tx + w.r * 0.5} ${ty + w.r}`);
-      n.setAttribute('stroke-opacity', Math.max(0, w.a * (1 - w.r / 40)).toFixed(2));
-    });
-    for (let k = this.waves.length; k < e.waves.childNodes.length; k++) e.waves.childNodes[k].setAttribute('stroke-opacity', 0);
+    // gases saindo da ponteira
+    e.plume.setTails([{ x: e.tail, y: 742 }]);
+    e.plume.update(st, P, dt);
   }
 }
 

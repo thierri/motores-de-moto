@@ -1,5 +1,5 @@
 import { DEFAULTS_BY, ENGINES, MODES } from './config.js';
-import { createState, step, shift } from './sim/engine.js';
+import { createState, step, shift, kick } from './sim/engine.js';
 import { Scene } from './render/scene.js';
 import { Panel } from './render/panel.js';
 import { Controls } from './ui/controls.js';
@@ -21,6 +21,10 @@ function mulberry32(a) {
 }
 
 const ICON = {
+  // silhuetas das motos (traço, cor do texto)
+  sport: '<svg class="mi" viewBox="0 0 52 28"><circle cx="11" cy="21" r="6"/><circle cx="41" cy="21" r="6"/><path d="M11 21 L19 13 L28 12 L35 9 L46 13 L41 21 M19 13 L16 9 L23 7 L30 9 M35 9 L40 6 L44 7 M28 12 L33 18 L41 21"/></svg>',
+  cruiser: '<svg class="mi" viewBox="0 0 52 28"><circle cx="10" cy="21" r="6"/><circle cx="43" cy="21" r="6"/><path d="M10 21 L17 15 L26 16 L29 13 L36 12 L43 21 M36 12 L33 4 L29 4 M17 15 L13 12 L21 11 M26 16 L30 21 L38 21"/></svg>',
+  street: '<svg class="mi" viewBox="0 0 52 28"><circle cx="11" cy="21" r="5.5"/><circle cx="41" cy="21" r="5.5"/><path d="M11 21 L18 14 L29 13 L37 9 L41 21 M18 14 L15 11 L23 10 M23 10 Q28 7 32 10 M37 9 L35 5 L31 5 M29 13 L31 19 L41 21"/><circle cx="39" cy="9" r="1.8"/></svg>',
   snd: '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
   mute: '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="m17 9 5 6M22 9l-5 6"/></svg>',
   gear: '<svg viewBox="0 0 24 24"><path d="M10.3 2h3.4l.5 2.6 2 .9 2.2-1.5 2.4 2.4-1.5 2.2.9 2 2.6.5v3.4l-2.6.5-.9 2 1.5 2.2-2.4 2.4-2.2-1.5-2 .9-.5 2.6h-3.4l-.5-2.6-2-.9-2.2 1.5-2.4-2.4 1.5-2.2-.9-2L2 13.7v-3.4l2.6-.5.9-2L4 5.6 6.4 3.2l2.2 1.5 2-.9z" fill="currentColor" fill-rule="evenodd"/><circle cx="12" cy="12" r="3.2" fill="#141f2b"/></svg>',
@@ -32,8 +36,8 @@ class App {
     this.stage = document.getElementById('stage');
     if (VIDEO) this.stage.classList.add('video');
     const q = qs.get('motor');
-    this.Ps = { i4: clone(DEFAULTS_BY.i4), v2: clone(DEFAULTS_BY.v2) };
-    this.P = this.Ps[q === 'v2' || q === 'harley' ? 'v2' : 'i4'];
+    this.Ps = { i4: clone(DEFAULTS_BY.i4), v2: clone(DEFAULTS_BY.v2), cg: clone(DEFAULTS_BY.cg) };
+    this.P = this.Ps[q === 'v2' || q === 'harley' ? 'v2' : q === 'cg' ? 'cg' : 'i4'];
     this.st = createState(this.P);
     this.acc = 0;
     this.pres = { active: false };
@@ -94,12 +98,10 @@ class App {
     const tb = document.getElementById('topbar');
     tb.innerHTML = `
       <div class="brand"><b id="brandT"></b><span id="brandS"></span></div>
-      <div class="seg engsel" id="engSel" data-spot="engine"><button data-v="i4">4 em linha</button><button data-v="v2">V-Twin</button></div>
-      <div class="layers" id="layers"><label>Camadas</label>
-        <button class="tg on" data-show="gas">Cores</button>
-        <button class="tg on" data-show="flow">Fluxo</button>
-        <button class="tg on" data-show="labels">Nomes</button>
-        <button class="tg on" data-show="values">Valores</button>
+      <div class="engsel" id="engSel" data-spot="engine">
+        <button data-v="i4">${ICON.sport}<span>4 em linha</span></button>
+        <button data-v="v2">${ICON.cruiser}<span>V-Twin</span></button>
+        <button data-v="cg">${ICON.street}<span>CG 125</span></button>
       </div>
       <div class="sp"></div>
       <div class="legend">
@@ -108,10 +110,6 @@ class App {
       <div class="sound" data-spot="sound"><button class="ic" id="btnSound" aria-label="Som">${ICON.snd}</button><input type="range" id="vol" min="0" max="1" step="0.01" value="0.8"></div>
       <button class="btn" id="btnParams" data-spot="params">${ICON.gear}Parâmetros</button>`;
     const $ = (s) => tb.querySelector(s);
-    tb.querySelectorAll('.tg').forEach((b) => b.addEventListener('click', () => {
-      const k = b.dataset.show;
-      this.setLayers({ [k]: !this.scene.layers[k] });
-    }));
     $('#btnSound').addEventListener('click', () => {
       this.sound.enabled = !this.sound.enabled;
       $('#btnSound').innerHTML = this.sound.enabled ? ICON.snd : ICON.mute;
@@ -139,7 +137,8 @@ class App {
 
   buildTabs() {
     const v2 = this.P.engine === 'v2';
-    const tabs = [['motor', v2 ? 'V-Twin' : '4 cilindros'], ['dentro', v2 ? 'Ritmo' : 'Por dentro'], ['escape', 'Escape']];
+    const eng = this.P.engine;
+    const tabs = [['motor', { i4: '4 cilindros', v2: 'V-Twin', cg: 'CG 125' }[eng]], ['dentro', { i4: 'Por dentro', v2: 'Ritmo', cg: 'Carburador' }[eng]], ['escape', 'Escape']];
     const box = document.getElementById('sceneTabs');
     const cur = this.scene.tab || 'motor';
     box.innerHTML = tabs.map(([k, n]) => `<button data-v="${k}" class="${k === cur ? 'on' : ''}">${n}</button>`).join('');
@@ -147,7 +146,7 @@ class App {
 
   setLayers(o) {
     this.scene.setLayers(o);
-    document.querySelectorAll('#topbar .tg').forEach((b) => b.classList.toggle('on', !!this.scene.layers[b.dataset.show]));
+    this.params.sync();
   }
 
   showDrawer(on) {
@@ -181,6 +180,8 @@ class App {
   setKey(on) { this.st.key = on; }
   setRun(on) { this.st.run = on; }
   shift(dir) { shift(this.st, this.P, dir); }
+  kick() { kick(this.st, this.P); }
+  setChoke(on) { if (ENGINES[this.P.engine].carb) this.st.choke = on; }
   setMode(m) { if (MODES[m]) this.P.mode = m; }
   cycleMode() { const k = Object.keys(MODES); this.setMode(k[(k.indexOf(this.P.mode) + 1) % k.length]); }
   setListen(v) { this.sound.listen = v; this.sound.applyListen(); }

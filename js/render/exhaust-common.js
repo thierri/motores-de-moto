@@ -35,7 +35,7 @@ export function noiseDb(st, P) {
   if (!(st.running && !st.broken) && st.rpm < 50) return 0;
   const o = exhaustOpen(P);
   const load = Math.max(0, Math.min(1, st.pr)) * (st.comb > 0 ? 1 : 0.5);
-  let db = 60 + 18 * load + 16 * Math.min(1.1, st.rpm / E.limit) + 14 * o + (P.muffler === false ? 5 : 0) + (E.cyl === 2 ? 4 : 0);
+  let db = 60 + 18 * load + 16 * Math.min(1.1, st.rpm / E.limit) + 14 * o + (P.muffler === false ? 5 : 0) + (E.cyl === 2 ? 4 : E.cyl === 1 ? -7 : 0);
   if (E.cyl === 4 && P.muffler !== false && o < 0.3) db -= 4 * (1 - flapOpen(st, P, E));
   return db;
 }
@@ -50,13 +50,13 @@ export class ExhaustInfo {
   constructor(g, x, y, w) {
     this.x = x; this.y = y; this.w = w;
     const b = el('g', { 'data-comp': 'exhaustSys', 'clip-path': 'url(#viewClip)' }, g);
-    el('rect', { x, y, width: w, height: 214, rx: 12, fill: '#0d151e', stroke: '#263446' }, b);
-    txt(b, x + 14, y + 26, 'Ruído estimado', { 'font-size': 13, fill: '#8da0b6' });
-    this.db = txt(b, x + 14, y + 66, '—', { 'font-size': 36, 'font-weight': 800, fill: '#fff', 'font-family': 'var(--mono)' });
-    txt(b, x + w - 14, y + 66, 'dB', { 'font-size': 14, fill: '#8da0b6', 'text-anchor': 'end' });
-    el('rect', { x: x + 14, y: y + 78, width: w - 28, height: 10, rx: 5, fill: '#1a2430' }, b);
-    this.bar = el('rect', { x: x + 14, y: y + 78, width: 0, height: 10, rx: 5 }, b);
-    this.lines = [0, 1, 2, 3].map((k) => txt(b, x + 14, y + 114 + k * 24, '', { 'font-size': 13, fill: '#c2cfdc' }));
+    el('rect', { x, y, width: w, height: 104, rx: 12, fill: '#0d151e', stroke: '#263446' }, b);
+    txt(b, x + 14, y + 24, 'Ruído estimado', { 'font-size': 12.5, fill: '#8da0b6' });
+    this.db = txt(b, x + 14, y + 66, '—', { 'font-size': 34, 'font-weight': 800, fill: '#fff', 'font-family': 'var(--mono)' });
+    txt(b, x + 132, y + 66, 'dB', { 'font-size': 13, fill: '#8da0b6', 'text-anchor': 'end' });
+    el('rect', { x: x + 14, y: y + 80, width: 118, height: 8, rx: 4, fill: '#1a2430' }, b);
+    this.bar = el('rect', { x: x + 14, y: y + 80, width: 0, height: 8, rx: 4 }, b);
+    this.lines = [0, 1, 2, 3].map((k) => txt(b, x + 144, y + 26 + k * 21, '', { 'font-size': 13, fill: '#c2cfdc' }));
     this.v = 0;
   }
 
@@ -66,11 +66,77 @@ export class ExhaustInfo {
     this.v += (d - this.v) * (1 - Math.exp(-dt / 0.25));
     this.db.textContent = d > 0 ? Math.round(this.v) : '—';
     const u = Math.max(0, Math.min(1, (this.v - 60) / 50));
-    attr(this.bar, { width: ((this.w - 28) * u).toFixed(1), fill: pColor(u) });
+    attr(this.bar, { width: (118 * u).toFixed(1), fill: pColor(u) });
     const L = this.lines;
-    L[0].textContent = P.muffler === false ? 'Sem silencioso' : `Silencioso: abafamento ${Math.round((P.baffle ?? 1) * 100)}%`;
-    L[1].textContent = `Tubos: ${fmt(P.pipeLen ?? 1, 2)}× o original`;
-    L[2].textContent = E.cyl === 4 ? `Válvula: ${flapOpen(st, P, E) ? 'aberta' : 'fechada'}${P.flap === 'auto' ? ' (automática)' : ''}` : 'Tubos com cruzamento';
-    L[3].textContent = (P.pipeLen ?? 1) > 1.05 ? 'Tubos longos: mais força no meio' : (P.pipeLen ?? 1) < 0.95 ? 'Tubos curtos: mais força em cima' : '';
+    L[0].textContent = P.muffler === false ? 'Sem silencioso' : `Abafamento ${Math.round((P.baffle ?? 1) * 100)}%`;
+    L[1].textContent = `Tubos ${fmt(P.pipeLen ?? 1, 2)}×`;
+    L[2].textContent = E.cyl === 4 ? `Válvula ${flapOpen(st, P, E) ? 'aberta' : 'fechada'}${P.flap === 'auto' ? ' (auto)' : ''}` : E.cyl === 2 ? 'Tubos com cruzamento' : 'Um tubo só';
+    L[3].textContent = (P.pipeLen ?? 1) > 1.05 ? 'Tubo longo: força no meio' : (P.pipeLen ?? 1) < 0.95 ? 'Tubo curto: força em cima' : '';
+  }
+}
+
+// Gases saindo da ponteira: quantidade, velocidade e comprimento crescem com o giro e a carga.
+// Cor: cinza-claro quente (normal), vapor branco (motor frio), cinza-escuro (mistura rica).
+// Nos pipocos (corte na desaceleração ou no corte de giro, com escape aberto) aparece uma chama na ponta.
+export class ExhaustPlume {
+  constructor(g, n = 70) {
+    this.g = el('g', { 'pointer-events': 'none' }, g);
+    this.tails = [];
+    this.n = n;
+    this.flames = [];
+  }
+  setTails(tails) {
+    // tails: [{ x, y }] em coordenadas do grupo
+    if (this.tails.length !== tails.length) {
+      this.g.innerHTML = '';
+      this.pool = tails.map(() => Array.from({ length: this.n }, () => ({ e: el('circle', { r: 0 }, this.g), age: 9, life: 1 })));
+      this.flames = tails.map(() => el('ellipse', { rx: 0, ry: 0, fill: 'url(#flame)' }, this.g));
+      this.acc = tails.map(() => 0);
+    }
+    this.tails = tails;
+  }
+  reset() { if (this.pool) for (const ps of this.pool) for (const q of ps) { q.age = 9; q.e.setAttribute('r', 0); } }
+
+  update(st, P, dt) {
+    if (!this.pool) return;
+    const E = profile(P);
+    const run = st.running && !st.broken;
+    const rel = Math.min(1.1, Math.max(0, st.rpm) / E.limit);
+    const load = Math.max(0, Math.min(1, st.pr)) * (st.comb > 0 ? 1 : 0.35);
+    const o = exhaustOpen(P);
+    const flow = run ? (0.15 + 0.85 * rel) * (0.35 + 0.65 * load) : st.starter ? 0.08 : 0;
+    const rate = flow > 0 ? 8 + 110 * flow : 0;          // partículas por segundo em cada ponteira
+    const speed = 40 + 430 * flow * (1 + 0.3 * o);     // px/s
+    const cold = st.temp.coolant < 50, rich = st.lambda < 0.84 && run;
+    const col = cold ? '#eef3f8' : rich ? '#5d636b' : '#c9d3dd';
+    const op = cold ? 0.45 : rich ? 0.5 : 0.3;
+    this.tails.forEach((t, ti) => {
+      const ps = this.pool[ti];
+      this.acc[ti] += rate * dt;
+      while (this.acc[ti] >= 1) {
+        this.acc[ti] -= 1;
+        const q = ps.find((x) => x.age >= x.life);
+        if (!q) break;
+        q.age = 0; q.life = 0.7 + 0.7 * Math.random();
+        q.x = t.x + 2; q.y = t.y + (Math.random() - 0.5) * 6;
+        q.vx = speed * (0.75 + 0.5 * Math.random()); q.vy = (Math.random() - 0.5) * 30 - 8;
+        q.r0 = 3 + 3 * flow; q.gr = 10 + 34 * flow;
+        q.e.setAttribute('fill', col);
+      }
+      for (const q of ps) {
+        if (q.age >= q.life) continue;
+        q.age += dt;
+        const k = Math.exp(-1.2 * dt);
+        q.vx *= k; q.vy = q.vy * k - 14 * dt;   // perde velocidade e sobe um pouco (gás quente)
+        q.x += q.vx * dt; q.y += q.vy * dt;
+        const u = Math.min(1, q.age / q.life);
+        if (u >= 1) { q.e.setAttribute('r', 0); continue; }
+        attr(q.e, { cx: q.x.toFixed(1), cy: q.y.toFixed(1), r: (q.r0 + q.gr * u).toFixed(1), 'fill-opacity': (op * Math.pow(1 - u, 1.5)).toFixed(3) });
+      }
+      // chama dos pipocos
+      const popping = run && (st.cut.decel || st.cut.lim || st.cut.qs > 0) && o > 0.4;
+      const fl = popping && Math.random() < 0.25 * o ? 1 : 0;
+      attr(this.flames[ti], { cx: t.x + 10, cy: t.y, rx: fl ? 10 + 10 * Math.random() : 0, ry: fl ? 5 + 3 * Math.random() : 0, 'fill-opacity': fl ? 0.9 : 0 });
+    });
   }
 }

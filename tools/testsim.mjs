@@ -1,6 +1,6 @@
 // Roteiro de testes da física, sem navegador: node tools/testsim.mjs [i4|v2]
 import { DEFAULTS_BY, ENGINES } from '../js/config.js';
-import { createState, step, shift, wotCurve, cv } from '../js/sim/engine.js';
+import { createState, step, shift, wotCurve, cv, kick } from '../js/sim/engine.js';
 
 const DT = 1 / 240;
 const f = (v, d = 0) => v.toFixed(d).padStart(7);
@@ -16,14 +16,31 @@ function test(key) {
   const c = wotCurve(P);
   let pk = c[0], tk = c[0];
   for (const p of c) { if (p.kw > pk.kw) pk = p; if (p.T > tk.T) tk = p; }
-  const pts = key === 'v2' ? [1000, 2000, 3000, 3250, 4000, 5000, 5500] : [2000, 4000, 6000, 8000, 10000, 11000, 12000, 13000, 14600];
+  const pts = key === 'cg' ? [2000, 4000, 6000, 6500, 8000, 8500, 9500] : key === 'v2' ? [1000, 2000, 3000, 3250, 4000, 5000, 5500] : [2000, 4000, 6000, 8000, 10000, 11000, 12000, 13000, 14600];
   console.log(pts.map((r) => { const p = c.reduce((a, b) => (Math.abs(b.rpm - r) < Math.abs(a.rpm - r) ? b : a)); return `${p.rpm}: ${p.T.toFixed(0)} Nm ${cv(p.kw).toFixed(0)} cv`; }).join(' · '));
   console.log(`pico: ${cv(pk.kw).toFixed(0)} cv a ${pk.rpm} · ${tk.T.toFixed(1)} Nm a ${tk.rpm}`);
 
+  // partida: frio (com afogador na CG) e depois quente; mede o tempo até pegar
+  const startUp = (lbl) => {
+    let t = 0, kicks = 0;
+    if (E.kick) {
+      while (!st.running && t < 20) { kick(st, P); kicks++; for (let k = 0; k < 0.7 / DT; k++) { step(st, P, DT); t += DT; if (st.running) break; } }
+    } else {
+      st.input.start = true;
+      while (!st.running && t < 10) { step(st, P, DT); t += DT; }
+      st.input.start = false;
+    }
+    console.log(`  ${lbl}: pegou em ${t.toFixed(2)} s${E.kick ? ` (${kicks} pedaladas)` : ''} ${st.running ? '' : 'NÃO PEGOU'}`);
+  };
   st.key = true; run(2.2);
-  st.input.start = true; run(1.0); show('partida 1 s');
-  st.input.start = false; run(4); show('marcha lenta fria');
+  if (E.carb) st.choke = true;
+  startUp('partida fria');
+  run(4); show('marcha lenta fria');
+  if (!st.running) { startUp('partida fria, 2ª tentativa'); run(3); }
+  st.choke = false;
   st.temp.coolant = 85; run(8); show('marcha lenta quente');
+  // partida a quente: desliga, liga de novo
+  st.key = false; run(4); st.key = true; run(2.2); startUp('partida quente'); run(3);
 
   st.input.grip = 1;
   let t1 = null;
@@ -45,7 +62,7 @@ function test(key) {
   for (let k = 0; k < 240 * 25; k++) {
     step(st, P, DT); tt += DT;
     if (t100 === null && st.v * 3.6 >= 100) t100 = tt;
-    if (st.rpm > 0.97 * P.limit && st.gear < 6 && st.cut.qs <= 0) {
+    if (st.rpm > 0.97 * P.limit && st.gear < E.gearbox.ratios.length - 1 && st.cut.qs <= 0) {
       if (!P.qs) { st.input.clutch = 1; step(st, P, DT); }
       shift(st, P, 1);
       st.input.clutch = 0;
@@ -56,4 +73,4 @@ function test(key) {
 }
 
 const which = process.argv[2];
-for (const k of which ? [which] : ['i4', 'v2']) test(k);
+for (const k of which ? [which] : ['i4', 'v2', 'cg']) test(k);

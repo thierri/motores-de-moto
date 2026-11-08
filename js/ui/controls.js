@@ -1,7 +1,7 @@
 // Comandos do piloto: chave, corta-corrente, partida, manopla do acelerador, câmbio, embreagem, freio,
 // modo de pilotagem e posição de escuta. Teclado e controle de videogame escrevem no mesmo lugar.
 // O roteiro da apresentação pode escrever em `script` (sobrepõe o usuário).
-import { MODES } from '../config.js';
+import { MODES, profile } from '../config.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
@@ -22,7 +22,8 @@ export class Controls {
       <div class="cgrp ign" data-spot="ign">
         <div class="cb"><button class="key" id="btnKey" aria-label="Chave"><span class="kh"></span></button><label>Chave <kbd>I</kbd></label></div>
         <div class="cb"><button class="kill" id="btnKill" aria-label="Corta-corrente"><span>RUN</span></button><label>Corta-corrente <kbd>K</kbd></label></div>
-        <div class="cb"><button class="startb" id="btnStart" aria-label="Partida"><span>START</span></button><label>Partida <kbd>Enter</kbd></label></div>
+        <div class="cb"><button class="startb" id="btnStart" aria-label="Partida"><span>START</span></button><label id="startL">Partida <kbd>Enter</kbd></label></div>
+        <div class="cb chokecb" id="chokeCb"><button class="chokeb" id="btnChoke" aria-label="Afogador"><span>AFOG.</span></button><label>Afogador <kbd>A</kbd></label></div>
       </div>
       <div class="grip" id="grip" data-spot="grip">
         <div class="gl"><b>Acelerador</b><span id="gripV">0%</span></div>
@@ -45,30 +46,24 @@ export class Controls {
         </div>
         <div class="keys"><kbd>Q</kbd>/<kbd>E</kbd> desce/sobe · <kbd>N</kbd> neutro · <kbd>C</kbd> embreagem · <kbd>S</kbd> freio</div>
       </div>
-      <div class="box" data-spot="mode">
-        <div class="gl"><b>Modo de pilotagem</b><kbd>M</kbd></div>
-        <div class="seg" id="modeSeg">${Object.entries(MODES).map(([k, m]) => `<button data-v="${k}">${m.name}</button>`).join('')}</div>
-        <div class="gl" style="margin-top:6px"><b>Ouvir de</b><kbd>O</kbd></div>
-        <div class="seg" id="listenSeg"><button data-v="rear">Atrás da moto</button><button data-v="rider">Piloto</button></div>
-      </div>
       <div class="info" id="info"></div>`;
     const $ = (s) => root.querySelector(s);
     this.e = {
       key: $('#btnKey'), kill: $('#btnKill'), start: $('#btnStart'), track: $('#gripTrack'), fill: $('#gripFill'), hand: $('#gripHand'),
       gv: $('#gripV'), lock: $('#gripLock'), gear: $('#gearV'), clutch: $('#btnClutch'), brake: $('#btnBrake'),
-      mode: $('#modeSeg'), listen: $('#listenSeg'),
+      choke: $('#btnChoke'), chokeCb: $('#chokeCb'), startL: $('#startL'),
     };
     this.e.key.addEventListener('click', () => app.setKey(!app.st.key));
     this.e.kill.addEventListener('click', () => app.setRun(!app.st.run));
-    this.hold(this.e.start, (v) => (this.user.start = v));
+    // partida elétrica: segurar; pedal (CG): cada toque é uma pedalada
+    this.hold(this.e.start, (v) => { this.user.start = v; if (v) app.kick(); });
+    this.e.choke.addEventListener('click', () => app.setChoke(!app.st.choke));
     this.hold(this.e.clutch, (v) => (this.user.clutch = v));
     this.hold(this.e.brake, (v) => (this.user.brake = v));
     $('#gUp').addEventListener('click', () => app.shift(1));
     $('#gDown').addEventListener('click', () => app.shift(-1));
     $('#gN').addEventListener('click', () => app.shift(0));
     this.e.lock.addEventListener('click', () => this.setLock(!this.lock));
-    this.e.mode.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) app.setMode(b.dataset.v); });
-    this.e.listen.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) app.setListen(b.dataset.v); });
     this.gripDrag();
     this.keys();
   }
@@ -113,7 +108,7 @@ export class Controls {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
       if (this.app.pres && this.app.pres.active) return;
       const k = map[e.code];
-      if (k) { this.kb[k] = true; e.preventDefault(); return; }
+      if (k) { if (k === 'start' && !e.repeat) this.app.kick(); this.kb[k] = true; e.preventDefault(); return; }
       if (e.repeat) return;
       if (e.code === 'KeyI') this.app.setKey(!this.app.st.key);
       else if (e.code === 'KeyK') this.app.setRun(!this.app.st.run);
@@ -121,6 +116,7 @@ export class Controls {
       else if (e.code === 'KeyQ' || e.code === 'PageDown') this.app.shift(-1);
       else if (e.code === 'KeyN') this.app.shift(0);
       else if (e.code === 'KeyM') this.app.cycleMode();
+      else if (e.code === 'KeyA') this.app.setChoke(!this.app.st.choke);
       else if (e.code === 'KeyO') this.app.setListen(this.app.sound.listen === 'rear' ? 'rider' : 'rear');
       else if (e.code === 'KeyL') this.setLock(!this.lock);
     });
@@ -185,7 +181,15 @@ export class Controls {
     e.gear.textContent = st.gear === 0 ? 'N' : `${st.gear}ª`;
     e.clutch.classList.toggle('on', st.input.clutch > 0.5);
     e.brake.classList.toggle('on', st.input.brake > 0.5);
-    e.mode.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === P.mode));
-    e.listen.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === this.app.sound.listen));
+    const E = profile(P);
+    if (this.eng !== P.engine) {
+      this.eng = P.engine;
+      e.chokeCb.style.display = E.carb ? '' : 'none';
+      this.root.querySelector('.cgrp').classList.toggle('four', !!E.carb);
+      e.start.querySelector('span').textContent = E.kick ? 'PEDAL' : 'START';
+      e.startL.innerHTML = E.kick ? 'Pedal de partida <kbd>Enter</kbd>' : 'Partida <kbd>Enter</kbd>';
+    }
+    e.choke.classList.toggle('on', !!st.choke);
+    if (E.kick) e.start.classList.toggle('on', st.kickT > 0.25);
   }
 }

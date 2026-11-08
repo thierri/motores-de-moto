@@ -46,8 +46,11 @@ kbd { font-family: var(--mono); font-size: 11px; background: #0d151e; border: 1p
 .brand b em { font-style: normal; color: var(--orange); }
 .brand span { font-size: 12px; color: var(--muted); max-width: 300px; white-space: normal; line-height: 1.2; }
 .brand b { white-space: nowrap; }
-.engsel { margin-left: 16px; }
-.engsel button { padding: 7px 14px; font-size: 14px; font-weight: 700; white-space: nowrap; }
+.engsel { margin-left: 16px; display: flex; gap: 6px; }
+.engsel button { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px 0 8px; border-radius: 10px; border: 1px solid var(--line2);
+  background: transparent; font-size: 14px; font-weight: 700; white-space: nowrap; color: var(--muted); }
+.engsel button.on { background: #1f4d80; border-color: #3c7cc0; color: #fff; }
+.engsel .mi { width: 48px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .layers { display: flex; gap: 6px; margin-left: 14px; align-items: center; }
 .layers > label { font-size: 12px; color: var(--dim); margin-right: 4px; text-transform: uppercase; letter-spacing: .8px; }
 .tg { height: 30px; padding: 0 12px; border-radius: 15px; border: 1px solid var(--line2); background: transparent; font-size: 13px; color: var(--muted); }
@@ -111,7 +114,7 @@ input[type=range] { accent-color: var(--accent); }
 
 /* ---------- comandos ---------- */
 #controls { background: linear-gradient(#111a24, #0c131b); border-top: 1px solid var(--line);
-  display: grid; grid-template-columns: 330px 500px 300px 290px 1fr; gap: 14px; padding: 14px 18px; }
+  display: grid; grid-template-columns: 410px 560px 320px 1fr; gap: 14px; padding: 14px 18px; }
 .cgrp { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; align-items: center; justify-items: center;
   background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px; }
 .cgrp .cb { display: flex; flex-direction: column; align-items: center; gap: 10px; }
@@ -127,6 +130,12 @@ input[type=range] { accent-color: var(--accent); }
 .startb { width: 86px; height: 86px; border-radius: 50%; border: 3px solid #2d3b4a; background: radial-gradient(circle at 40% 35%, #3a4859, #1c2631 70%); display: grid; place-items: center; padding: 0; box-shadow: 0 5px 0 #0a0f15; }
 .startb span { font-weight: 800; font-size: 13px; letter-spacing: .5px; color: #cbd6e2; }
 .startb.on { transform: translateY(4px); box-shadow: 0 1px 0 #0a0f15; border-color: var(--yellow); }
+.cgrp.four { grid-template-columns: repeat(4, 1fr); }
+.chokeb { width: 76px; height: 76px; border-radius: 14px; border: 3px solid #2d3b4a; background: radial-gradient(#22303f, #151f29); padding: 0; display: grid; place-items: center; }
+.chokeb span { font-weight: 800; font-size: 13px; color: #8a9bb0; }
+.chokeb.on { border-color: var(--yellow); box-shadow: 0 0 16px #f2b63255; }
+.chokeb.on span { color: var(--yellow); }
+.f916 .chokeb { width: 84px; height: 84px; }
 
 .grip { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; display: flex; flex-direction: column; justify-content: space-between; }
 .gl { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
@@ -194,7 +203,9 @@ input[type=range] { accent-color: var(--accent); }
 .f916 .brand span, .f916 .layers, .f916 .legend, .f916 #vol { display: none; }
 .f916 .brand b { font-size: 34px; }
 .f916 .engsel { margin-left: 0; }
-.f916 .engsel button { font-size: 26px; padding: 14px 20px; }
+.f916 .engsel button { font-size: 22px; height: 70px; padding: 0 12px; flex-direction: column; gap: 0; justify-content: center; }
+.f916 .engsel .mi { width: 56px; height: 30px; }
+.f916 .brand b { font-size: 28px !important; }
 .f916 .ic { width: 66px; height: 66px; border-radius: 16px; }
 .f916 .ic svg { width: 32px; height: 32px; }
 .f916 #btnParams { width: 66px; height: 66px; padding: 0; justify-content: center; font-size: 0; border-radius: 16px; gap: 0; }

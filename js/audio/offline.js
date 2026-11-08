@@ -2,7 +2,7 @@
 // Uso no console: const m = await import('./js/audio/offline.js'); await m.record('teste', m.SCRIPTS.rev)
 // O WAV vai por POST para tools/serve.py (tools/out/<nome>.wav). Também serve para o vídeo, no futuro.
 import { DEFAULTS_BY } from '../config.js';
-import { createState, step, shift } from '../sim/engine.js';
+import { createState, step, shift, kick } from '../sim/engine.js';
 import { Sound } from './sound.js';
 
 const FPS = 60, PHYS = 1 / 240;
@@ -17,6 +17,18 @@ export const SCRIPTS = {
   start: { sec: 6, prep: { warm: false, off: true }, fn: (t, st, P, c) => {
     c.once('k', () => { st.key = true; });
     c.start = t > 2.3 && t < 3.3;
+    c.grip = 0;
+  } },
+  // partida longa: gira ~1,5 s antes de pegar (a bomba ainda está escorvando)
+  crank: { sec: 5, prep: { warm: false, off: true }, fn: (t, st, P, c) => {
+    c.once('k', () => { st.key = true; });
+    c.start = t > 0.6 && t < 2.6;
+    c.grip = 0;
+  } },
+  // pedal (CG): fria com afogador, uma pedalada a cada 0,8 s até pegar
+  kick: { sec: 6, prep: { warm: false, off: true }, fn: (t, st, P, c) => {
+    c.once('k', () => { st.key = true; st.choke = true; });
+    if (!st.running && t > 0.5 && t - (c.lastKick || 0) > 0.8) { c.lastKick = t; kick(st, P); }
     c.grip = 0;
   } },
   // pista: 1ª, sai, sobe marchas com quickshifter até a 4ª, solta

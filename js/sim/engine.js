@@ -156,7 +156,8 @@ export function createState(P, o = {}) {
   return {
     t: 0,
     input: { grip: 0, start: false, clutch: 0, brake: 0 },
-    key: false, run: true, pumpT: 0, primed: false,
+    key: false, run: true, pumpT: 0, primed: false, choke: false,
+    crankAcc: 0, fires: 0, crankP: 0, fragile: 0, cough: 0, kickT: 0,
     omega: 0, rpm: 0, running: false, starter: false, broken: null, crankMsg: '',
     tps: 0, tpsReq: 0, idleA: 0.0045, idleI: 0, pr: 1, cam: 0, camFull: false,
     lambda: 1, adv: 0, retard: 0, knock: 0, knockT: 0, float: 0, overT: 0,
@@ -185,7 +186,7 @@ export function shift(st, P, dir) {
   if (dir === 0) {
     if (g !== 1 && g !== 2) { say(st, 'O neutro fica entre a 1ª e a 2ª (padrão 1-N-2-3-4-5-6).'); return; }
     ng = 0;
-  } else if (dir > 0) ng = g === 0 ? 2 : Math.min(6, g + 1);
+  } else if (dir > 0) ng = g === 0 ? 2 : Math.min(E.gearbox.ratios.length - 1, g + 1);
   else ng = g === 0 ? 1 : g === 2 && st.v < 0.5 ? 1 : Math.max(1, g - 1);
   if (ng === g) return;
   const pulled = st.input.clutch > 0.6;
@@ -219,18 +220,20 @@ export function step(st, P, dt) {
   const J = E.J * P.inertia;
 
   // bomba de combustível: escorva 2 s ao ligar a chave
-  if (st.key && !st.wasKey) { st.pumpT = 2.0; st.primed = false; }
+  // carburador: a cuba já está cheia, não há bomba elétrica
+  if (st.key && !st.wasKey) { st.pumpT = E.carb ? 0 : 2.0; st.primed = !!E.carb; }
   st.wasKey = st.key;
   if (!st.key) { st.primed = false; st.pumpT = 0; }
   if (st.pumpT > 0) { st.pumpT -= dt; if (st.pumpT <= 0) st.primed = true; }
-  const pumpOn = st.key && (st.pumpT > 0 || st.running);
+  const pumpOn = !E.carb && st.key && (st.pumpT > 0 || st.running);
 
   // motor de partida: só em neutro ou com embreagem puxada
   const canCrank = st.key && st.run && !st.broken;
   const allowStart = st.gear === 0 || inp.clutch > 0.6;
-  st.starter = inp.start && canCrank && !st.running && allowStart;
-  if (inp.start && canCrank && !st.running && !allowStart && st.msgT <= 0) say(st, 'Para dar partida engrenado, puxe a embreagem (C).');
-  if (inp.start && canCrank && !st.running && allowStart && !st.primed && st.msgT <= 0) say(st, 'A bomba de combustível ainda está escorvando: segure a partida mais um pouco.', 1.5);
+  st.starter = !E.kick && inp.start && canCrank && !st.running && allowStart;
+  if (st.kickT > 0) st.kickT -= dt;
+  if (!E.kick && inp.start && canCrank && !st.running && !allowStart && st.msgT <= 0) say(st, 'Para dar partida engrenado, puxe a embreagem (C).');
+  if (!E.kick && inp.start && canCrank && !st.running && allowStart && !st.primed && st.msgT <= 0) say(st, 'A bomba de combustível ainda está escorvando: segure a partida mais um pouco.', 1.5);
 
   // acelerador eletrônico
   const grip = clamp(inp.grip, 0, 1);
@@ -241,13 +244,15 @@ export function step(st, P, dt) {
 
   // marcha lenta (PI na válvula de ar) com marcha lenta acelerada a frio
   const cold = clamp((60 - st.temp.coolant) / 40, 0, 1);
-  const idleT = P.idle * (1 + 0.36 * cold);
+  // afogador (carburador): acelera a lenta e enriquece a mistura
+  const choke = E.carb && st.choke;
+  const idleT = P.idle * (1 + 0.36 * cold) + (choke ? 500 : 0);
   const ib = idleBase(E), ik = ib / 0.0036, rs = E.idle / 1250;   // escala do controle para cada motor
   if (st.running && grip < 0.02) {
     const e = clamp((idleT - st.rpm) / (1000 * rs), -0.6, 0.6);
     // derivada da rotação amortece a oscilação (o coletor atrasa a resposta)
     const dr = (st.rpm - (st.rpmPrev ?? st.rpm)) / dt / (1000 * rs);
-    if (st.rpm < idleT + 400 * rs) st.idleI = clamp(st.idleI + e * 0.0035 * ik * dt, -0.0025 * ik, 0.01 * ik);
+    if (st.rpm < idleT + 400 * rs || (E.carb && !st.cut.lim)) st.idleI = clamp(st.idleI + e * 0.0035 * ik * dt, -0.0025 * ik, 0.01 * ik);
     const cmd = clamp(ib + 0.0012 * ik * e - 0.00025 * ik * dr + st.idleI, 0.0012 * ik, 0.025 * ik);
     st.idleA += (cmd - st.idleA) * (1 - Math.exp(-dt / 0.04));
   } else if (!st.running) {
@@ -274,12 +279,12 @@ export function step(st, P, dt) {
   if (st.cut.qs > 0) st.cut.qs -= dt;
   if (st.rpm >= P.limit) st.cut.lim = true;
   else if (st.rpm < P.limit - 200 * (E.limit / 14600) ** 0.5) st.cut.lim = false;
-  if (grip < 0.02 && st.blip <= 0 && st.rpm > idleT + 650 * rs && st.running) st.cut.decel = true;
+  if (!E.carb && grip < 0.02 && st.blip <= 0 && st.rpm > idleT + 650 * rs && st.running) st.cut.decel = true;
   else if (st.rpm < idleT + 350 * rs || grip >= 0.02) st.cut.decel = false;
   st.cut.any = st.cut.lim || st.cut.decel || st.cut.qs > 0;
 
   // mistura e ignição
-  st.lambda = lambdaTarget(st.tps, st.rpm, E) / P.fuel;
+  st.lambda = lambdaTarget(st.tps, st.rpm, E) / P.fuel * (choke ? 0.8 : 1) * (E.carb && !choke ? 1 + 0.12 * cold : 1);
   st.advBase = advanceMap(st.rpm, st.pr, E);
   const advDelta = P.advance - st.retard;
   st.adv = st.advBase + advDelta;
@@ -288,6 +293,8 @@ export function step(st, P, dt) {
   const fire = st.running && st.primed && st.key && st.run && !st.broken;
   let comb = fire ? 1 : 0;
   if (fire && P.failSpark) comb *= 1 - 1 / E.cyl;
+  if (fire && choke && st.temp.coolant > 60) comb *= 0.82;   // afogando: mistura rica demais
+  if (fire && st.fragile > 0) comb *= 0.75 + 0.25 * Math.random();
   if (fire && st.lambda > 1.3) comb *= clamp(1 - (st.lambda - 1.3) * 3, 0, 1);
   if (st.cut.any) comb = 0;
   st.comb = comb;
@@ -324,7 +331,7 @@ export function step(st, P, dt) {
   st.rpm = st.omega * RPM;
 
   // pega e apaga
-  if (!st.running && fire === false && st.key && st.run && st.primed && !st.broken && st.rpm > 160) st.running = true;
+  startModel(st, P, E, dt, cold, choke);
   if (st.running && (st.rpm < 110 || !st.key || !st.run || st.broken)) {
     if (st.running && st.rpm < 110 && st.key && st.run && !st.broken && !st.starter) say(st, st.gear ? 'O motor apagou: soltou a embreagem com pouco giro.' : 'O motor apagou.');
     st.running = false;
@@ -346,6 +353,59 @@ export function step(st, P, dt) {
   const vrpm = P.anim === 'real' ? st.rpm : 40 * Math.pow(Math.max(0, st.rpm) / 1000, 0.7);
   st.vis.rpm = vrpm;
   st.vis.theta = (st.vis.theta + vrpm / 60 * 360 * dt) % 720;
+}
+
+// Partida: o motor não pega na hora. A cada compressão girando na partida (ou no pedal) há uma chance de
+// a mistura explodir ("tossir"); depois de algumas explosões seguidas ele pega. Frio é mais difícil e pode
+// pegar e morrer. Injeção: acelerador todo aberto corta a injeção (desafogar). Carburador: precisa do
+// afogador frio; com o afogador e o motor quente, afoga.
+function startModel(st, P, E, dt, cold, choke) {
+  st.crankP = 0;
+  if (st.fragile > 0) {
+    st.fragile -= dt;
+    if (st.running && Math.random() < dt * 0.9 * cold * (choke ? 0.1 : 1)) {
+      st.running = false; st.fires = 0; st.fragile = 0;
+      say(st, E.carb ? 'Pegou e morreu: motor frio. Use o afogador (A).' : 'Pegou e morreu: o motor está frio. Tente de novo.');
+    }
+  }
+  const able = !st.running && st.key && st.run && st.primed && !st.broken && st.rpm > (E.kick ? 120 : 100);
+  if (!able) { if (st.rpm < 40) { st.fires = 0; st.crankAcc = 0; } return; }
+  let p;
+  if (E.carb) {
+    const warm = 1 - cold;
+    p = choke ? 0.55 * cold + 0.12 * warm : 0.06 * cold + 0.35 * warm;
+    if (st.input.grip > 0.5) p *= 0.4;
+  } else {
+    p = 0.45 - 0.3 * cold;
+    if (st.input.grip > 0.85) { p = 0; if (st.msgT <= 0) say(st, 'Acelerador todo aberto na partida: a injeção corta o combustível (desafogar).', 2); }
+  }
+  if (P.failSpark && E.cyl === 1) p = 0;
+  st.crankP = p;
+  st.crankAcc += st.rpm / 60 * Math.max(1, E.cyl) / 2 * dt;
+  while (st.crankAcc >= 1) {
+    st.crankAcc -= 1;
+    if (Math.random() < p) {
+      st.fires++;
+      st.cough = 1;
+      st.omega += (E.kick ? 25 : 12);      // a explosão dá um empurrão no virabrequim
+      if (st.fires >= E.needFires) {
+        st.running = true; st.fires = 0; st.fragile = cold > 0.2 ? 1.5 : 0;
+        if (st.msgT > 0 && /morreu|afog|escorv/.test(st.msg)) st.msgT = 0;
+        break;
+      }
+    }
+  }
+}
+
+// Pedal de partida (CG): um chute gira o motor rápido por um instante
+export function kick(st, P) {
+  const E = profile(P);
+  if (!E.kick || st.running || st.broken || st.kickT > 0) return;
+  if (st.gear !== 0 && st.input.clutch < 0.6) { say(st, 'Para dar partida no pedal, coloque em neutro (N) ou puxe a embreagem (C).'); return; }
+  st.kickT = 0.45;
+  st.snd.kick = 1;
+  if (!st.key) { say(st, 'Ligue a chave (I) antes de dar partida.'); }
+  st.omega = Math.max(st.omega, (680 + 160 * Math.random()) / RPM);
 }
 
 function breakEngine(st, why) {

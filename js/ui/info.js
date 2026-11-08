@@ -75,6 +75,47 @@ const T2 = {
 };
 const DEFAULT2 = ['Como usar', 'Ligue a chave (I), espere a escorva e segure a partida (Enter). Acelere com ↑ ou Espaço e ouça o "batata-batata" na lenta. Para andar: embreagem (C), 1ª (Q) e solte a embreagem. Sem quickshifter, troque com a embreagem. Clique em qualquer peça.'];
 
+// textos da CG 125 (monocilíndrico com carburador)
+const T3 = {
+  piston: ['Pistão', 'Um só, de 56,5 mm de diâmetro. É pequeno e leve, mas sozinho: entre uma explosão e outra o motor depende do volante para continuar girando.',
+    (s) => `velocidade média ${fmt(2 * 0.0495 * s.rpm / 60, 1)} m/s`],
+  rod: ['Biela', 'Liga o pistão ao virabrequim. Num monocilíndrico ela trabalha sozinha, e o motor vibra mais: não há outro pistão para equilibrar o movimento.'],
+  crank: ['Volante do magneto', 'O virabrequim tem um volante pesado na ponta, com ímãs (o magneto) que geram a eletricidade da moto. O peso guarda energia para as três voltas e meia em que o motor não explode.',
+    (s) => `${fmtInt(s.rpm)} rpm`],
+  cylinder: ['Cilindro', 'Um cilindro de 124 cc, inclinado para frente e com aletas para o vento esfriar.'],
+  chamber: ['Câmara de combustão', 'A cor mostra a pressão do gás. Uma explosão a cada duas voltas: na lenta, você quase consegue contar.'],
+  head: ['Cabeçote', 'Só duas válvulas, uma de admissão e uma de escape, abertas por balancins. Simples, barato de manter e muito durável.'],
+  fins: ['Aletas', 'Arrefecimento a ar: o vento passando pelas aletas leva o calor. Parada no trânsito, ela esquenta.', (s) => `óleo ${Math.round(s.temp.coolant)} °C`],
+  crankcase: ['Cárter', 'A mesma carcaça guarda o virabrequim, o comando, o câmbio e o óleo.'],
+  oil: ['Óleo', 'Lubrifica o motor e o câmbio, que dividem o mesmo óleo.', (s) => `${fmt(s.oilP, 1)} bar · ${Math.round(s.temp.oil)} °C`],
+  camV2: ['Comando no cárter', 'Um eixo com dois ressaltos, girando na metade da rotação do motor. Ele empurra os tuchos, que empurram as varetas.'],
+  lifter: ['Tuchos', 'Seguem os ressaltos do comando. São mecânicos: a folga é regulada na mão, e o "tec-tec" do cabeçote é a cara da CG.'],
+  pushrod: ['Varetas', 'Levam o movimento do comando, lá embaixo, até os balancins, lá em cima. É o motor OHV clássico.'],
+  rocker: ['Balancins', 'Alavancas no cabeçote: a vareta empurra um lado e o outro abre a válvula.'],
+  valveIn: ['Válvula de admissão', 'Deixa entrar a mistura de ar e gasolina que vem do carburador.'],
+  valveEx: ['Válvula de escape', 'Solta o gás queimado para o escapamento.'],
+  spark: ['Vela', 'Uma vela, acionada pela ignição eletrônica (CDI) alimentada pelo magneto.', (s) => `avanço ${fmt(s.adv, 0)}° antes do PMS`],
+  intake: ['Coletor de admissão', 'Leva a mistura do carburador ao cabeçote. A cor mostra a pressão.', (s) => `${Math.round(s.pr * 101.3)} kPa`],
+  carb: ['Carburador', 'Não há injeção eletrônica: o próprio ar passando puxa a gasolina. A manopla puxa um cabo que sobe a gaveta e deixa passar mais ar. Veja na aba de cima à direita como ele funciona por dentro.',
+    (s) => `gaveta ${Math.round(s.tps * 100)}% · λ ${fmt(s.lambda, 2)}`],
+  venturi: ['Venturi', 'O estreitamento do duto. Ali o ar acelera e a pressão cai: é essa queda que puxa a gasolina para cima pelo giclê.'],
+  slide: ['Gaveta (pistonete)', 'Sobe e desce com a manopla, abrindo ou fechando a passagem do ar. Ela carrega a agulha junto.'],
+  needle: ['Agulha', 'Cônica, presa na gaveta. Quanto mais a gaveta sobe, mais a agulha sai do giclê e mais gasolina passa.'],
+  jet: ['Giclê', 'Um furo calibrado por onde a gasolina sobe da cuba. O tamanho dele decide quanta gasolina a moto recebe em alta.'],
+  bowl: ['Cuba', 'Um pequeno reservatório de gasolina embaixo do carburador, sempre no mesmo nível.'],
+  float: ['Boia', 'Flutua na gasolina e fecha a entrada de combustível quando a cuba enche, como a boia de uma caixa-d\'água.'],
+  choke: ['Afogador', 'Uma borboleta na entrada de ar. Fechada, deixa passar pouco ar e a mistura fica rica: é o que o motor frio precisa para pegar. Com o motor quente, ela afoga o motor. Tecla A.',
+    (s) => `afogador ${s.choke ? 'ligado' : 'desligado'}`],
+  airbox: ['Filtro de ar', 'Segura a poeira antes do carburador.'],
+  filter: ['Filtro de ar', 'Entupido, a mistura fica rica e a moto perde força.'],
+  gearbox: ['Câmbio', 'Cinco marchas, no mesmo bloco do motor. As engrenagens só giram com a moto engatada.', (s) => (s.gear ? `${s.gear}ª marcha` : 'neutro')],
+  kick: ['Pedal de partida', 'A CG clássica não tem motor de arranque: um chute no pedal gira o motor e, se a mistura estiver boa, ele pega. Toque em Partida (ou Enter) para dar uma pedalada.'],
+  header: ['Escapamento', 'Um tubo comprido sai pela frente do cabeçote e corre por baixo do motor.', (s) => `${Math.round(s.temp.egt)} °C`],
+  exhaustSys: ['Escapamento', 'Um tubo só, com o silencioso no fim. O som de uma explosão a cada duas voltas é o "pop-pop" típico das motos pequenas.'],
+  muffler: ['Silencioso', 'Abafa o som. A ponteira aberta deixa o "pop-pop" mais alto e estalado.'],
+};
+const DEFAULT3 = ['Como usar', 'Ligue a chave (I). Com o motor frio, ligue o afogador (A) e dê pedaladas (Enter ou o botão Pedal) até pegar. Depois que esquentar, desligue o afogador. Para andar: embreagem (C), 1ª (Q) e solte a embreagem acelerando. Clique em qualquer peça.'];
+
 const DEFAULT = ['Como usar', 'Ligue a chave (I), espere a bomba de combustível escorvar e segure a partida (Enter). Acelere com ↑ ou Espaço. Para andar: embreagem (C), engate a 1ª (Q) e solte a embreagem acelerando. Clique em qualquer peça para saber o que ela faz.'];
 
 export class Info {
@@ -95,7 +136,8 @@ export class Info {
     if (P && this.eng !== P.engine) { this.eng = P.engine; force = true; }
     st = st || this.st;
     const v2 = P && P.engine === 'v2';
-    const [h, p, live] = (v2 ? T2[this.sel] : null) || T[this.sel] || (v2 ? DEFAULT2 : DEFAULT);
+    const cg = P && P.engine === 'cg';
+    const [h, p, live] = (cg ? T3[this.sel] : null) || (v2 ? T2[this.sel] : null) || T[this.sel] || (cg ? DEFAULT3 : v2 ? DEFAULT2 : DEFAULT);
     let lv = live && st ? live(st, P) : '';
     if (!this.sel && st && st.msg && st.msgT > 0) lv = st.msg;
     if (!force && lv === this.lastLive) return;
