@@ -1,0 +1,6 @@
+documentacao/
+.DS_Store
+tools/out/
+*.wav
+*.m4a
+.claude/
