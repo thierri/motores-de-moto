@@ -4,3 +4,7 @@ tools/out/
 *.wav
 *.m4a
 .claude/
+video/build/
+video/project/
+video/project-916/
+exports/

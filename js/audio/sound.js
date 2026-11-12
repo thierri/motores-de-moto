@@ -121,6 +121,25 @@ export class Sound {
     // ventoinha do radiador
     this.fanG = this.gain(0, this.bus);
     this.loop(white).connect(this.filt('bandpass', 520, 0.8, this.fanG));
+    // carros: zumbido das pás da ventoinha, assobio do turbo, pneus cantando e vapor da água fervendo
+    this.fanHumG = this.gain(0, this.bus);
+    this.fanOsc = c.createOscillator(); this.fanOsc.type = 'triangle'; this.fanOsc.frequency.value = 120;
+    this.fanOsc.connect(this.filt('lowpass', 420, 0.7, this.fanHumG)); this.fanOsc.start();
+    this.turboG = this.gain(0, this.bus);
+    this.turboOsc = c.createOscillator(); this.turboOsc.type = 'sine'; this.turboOsc.frequency.value = 2000;
+    this.turboOsc.connect(this.turboG); this.turboOsc.start();
+    this.turboNG = this.gain(0, this.bus);
+    this.turboNF = this.filt('bandpass', 4000, 3, this.turboNG);
+    this.loop(white).connect(this.turboNF);
+    this.sqG = this.gain(0, this.bus);
+    this.loop(white).connect(this.filt('bandpass', 1450, 9, this.sqG));
+    this.loop(white).connect(this.filt('bandpass', 2150, 12, this.sqG));
+    // Wankel: apito do painel avisando que o corte de giro está chegando (o motor é tão liso que não dá para sentir)
+    this.beepG = this.gain(0, this.bus);
+    this.beepOsc = c.createOscillator(); this.beepOsc.type = 'square'; this.beepOsc.frequency.value = 2350;
+    this.beepOsc.connect(this.filt('lowpass', 3200, 0.7, this.beepG)); this.beepOsc.start();
+    this.steamG = this.gain(0, this.bus);
+    this.loop(white).connect(this.filt('highpass', 3200, 0.7, this.steamG));
 
     // câmbio (zumbido de engrenagem com carga)
     this.gbG = this.gain(0, this.bus);
@@ -166,6 +185,7 @@ export class Sound {
     this.set(this.exG.gain, r ? 0.62 : 1.0, 0.1);
     this.set(this.inG.gain, r ? 1.25 : 0.32, 0.1);
     this.set(this.meG.gain, r ? 0.9 : 0.3, 0.1);
+    if (this.car) this.set(this.exG.gain, r ? 0.5 : 1.0, 0.1);   // dentro do carro o escape chega mais abafado
   }
 
   // ---------- eventos ----------
@@ -197,6 +217,14 @@ export class Sound {
     for (let i = 0; i < 6; i++) this.burst(2600 + this.rand() * 900, 6, 0.018, 0.14 * (1 - i / 8), 'bandpass', 0.03 + i * 0.022);
     this.burst(1400, 3, 0.05, 0.12, 'bandpass', 0.36);
   }
+  // válvula de alívio do turbo: o ar comprimido escapa de uma vez quando a borboleta fecha
+  bovSnd(b, recirc) {
+    const a = Math.min(1, b / 1.2);
+    if (recirc) { this.burst(900, 0.8, 0.25, 0.07 * a, 'bandpass'); return; }
+    this.burst(2600, 0.8, 0.32 + 0.2 * a, 0.3 * a, 'bandpass');
+    this.burst(5200, 1.2, 0.2, 0.12 * a, 'bandpass', 0.01);
+    for (let i = 0; i < 4; i++) this.burst(1500, 2.5, 0.035, 0.1 * a * (1 - i / 5), 'bandpass', 0.12 + i * 0.045);
+  }
   bang() { this.burst(300, 0.6, 0.6, 1.0, 'lowpass'); this.tone(70, 0.5, 0.8, 'sine', 0, 35); for (let i = 0; i < 8; i++) this.burst(2000 + this.rand() * 4000, 5, 0.15, 0.3, 'bandpass', 0.05 + i * 0.06); }
 
   resetFx() { this.prev = null; this.popEnv = 0; this.flap = 0; }
@@ -206,7 +234,7 @@ export class Sound {
   engineCfg(P) {
     const E = profile(P), V = E.valve;
     return {
-      ...E.snd, n: E.cyl, off: E.firing[P.crank] || Object.values(E.firing)[0],
+      ...E.snd, n: E.snd.n || E.cyl, off: E.snd.off || E.firing[P.crank] || Object.values(E.firing)[0],
       ivo: V.full.ivo + 720, ivc: V.full.ivc, evo: V.exh.evo, evc: V.exh.evc,
     };
   }
@@ -224,6 +252,8 @@ export class Sound {
       this.cfgKey = cfgKey;
       this.cfg = this.engineCfg(P);
       if (this.node) this.node.port.postMessage({ cfg: this.cfg });
+      this.car = !!E.car;
+      this.applyListen();
     }
     // eventos por mudança de estado
     if (prev) {
@@ -233,13 +263,17 @@ export class Sound {
       if (st.snd.grind) { this.grind(); st.snd.grind = 0; }
       if (st.snd.bang) { this.bang(); st.snd.bang = 0; }
       if (st.snd.kick) { this.kickSnd(); st.snd.kick = 0; }
+      if (st.snd.bov) { this.bovSnd(st.snd.bov, P.bov === 'recirc'); st.snd.bov = 0; }
+      // embreagem do compressor do ar-condicionado
+      if (E.car && !!st.ac !== prev.ac && st.running) { this.click(0.2); this.tone(160, 0.12, 0.12, 'sine', 0.01, 110); }
+      if (E.car && !!st.heater !== prev.heater) this.click(0.1);
       // solenoide engatando (clack) e o pinhão soltando (clunk) ao parar de girar a partida
       if (st.starter && !prev.starter) { this.burst(700, 0.8, 0.06, 0.5, 'lowpass'); this.burst(2400, 3, 0.025, 0.25); this.tone(140, 0.07, 0.25, 'sine', 0, 90); }
       if (!st.starter && prev.starter) { this.burst(500, 0.9, 0.05, 0.3, 'lowpass', 0.01); this.burst(1800, 3, 0.03, 0.12, 'bandpass', 0.015); }
     }
 
     // motor de partida
-    const st_on = st.starter, v2 = E.cyl === 2;
+    const st_on = st.starter, v2 = E.key === 'v2' || !!E.car;   // carro: motor de partida mais pesado
     const crank = Math.max(0, st.rpm);
     this.set(this.stG.gain, st_on ? (v2 ? 0.15 : 0.12) : 0, st_on ? 0.015 : 0.12);
     // tom do motor elétrico: sobe com a rotação; ao soltar ele desacelera em vez de sumir de uma vez
@@ -247,7 +281,7 @@ export class Sound {
     this.set(this.stOsc.frequency, st_on ? f0 : f0 * 0.5, st_on ? 0.05 : 0.15);
     this.set(this.stOsc2.frequency, st_on ? f0 * 2 : f0, st_on ? 0.05 : 0.15);
     // compressões por segundo: 4 em linha = 2 por volta; V-Twin = 1 por volta (e bem mais pesadas)
-    const comp = Math.max(2, crank / 60 * (v2 ? 1 : 2));
+    const comp = Math.max(2, crank / 60 * (E.car ? (E.firesPerRev || E.cyl / 2) : v2 ? 1 : 2));
     this.set(this.stLfo.frequency, comp, 0.05);
     this.set(this.stLfoA.gain, v2 ? 0.42 : 0.3, 0.1);
     this.set(this.stGear.gain, st_on ? (v2 ? 0.26 : 0.17) : 0, 0.03);
@@ -255,7 +289,20 @@ export class Sound {
     // bomba, ventoinha
     const priming = st.key && st.pumpT > 0;
     this.set(this.pumpG.gain, priming ? 0.05 : 0, 0.05);
-    this.set(this.fanG.gain, st.fan && st.key ? 0.06 : 0, 0.4);
+    const fs = E.car ? st.fanSpd : st.fan && st.key ? 1 : 0;
+    this.set(this.fanG.gain, 0.055 * fs, E.car ? 0.1 : 0.4);
+    this.set(this.fanHumG.gain, E.car ? 0.045 * Math.min(1.9, fs) : 0, 0.1);
+    this.set(this.fanOsc.frequency, 40 + 105 * fs, 0.1);
+    // turbo: assobio que sobe com a rotação da turbina
+    const sp = E.turbo && !st.broken ? Math.min(1.3, st.spool) : 0, rd = this.listen === 'rider' ? 0.7 : 1;
+    this.set(this.turboOsc.frequency, 1400 + 6200 * sp, 0.04);
+    this.set(this.turboG.gain, 0.03 * sp * sp * rd, 0.05);
+    this.set(this.turboNF.frequency, 2500 + 4500 * sp, 0.05);
+    this.set(this.turboNG.gain, 0.05 * sp * sp * rd, 0.05);
+    this.set(this.sqG.gain, st.spin ? 0.5 : 0, st.spin ? 0.04 : 0.12);
+    this.set(this.steamG.gain, 0.07 * (st.steam || 0), 0.2);
+    const beep = E.rotary && P.beep !== false && st.running && st.rpm > 0.94 * P.limit;
+    this.set(this.beepG.gain, beep ? 0.035 : 0, 0.004);
 
     // vento, pneus, câmbio
     const v = st.v, rider = this.listen === 'rider';
@@ -279,9 +326,13 @@ export class Sound {
       // girando sem pegar: algumas compressões explodem (tossidas) antes de o motor pegar
       if (!st.running && st.key && st.run && !st.broken && st.rpm > 60) fuel = Math.min(0.9, st.crankP * 0.9);
       if (firing && st.lambda > 1.3) fuel *= Math.max(0, 1 - (st.lambda - 1.3) * 3);
+      // Wankel com janela ampliada: explosões que falham na lenta (o "brap-brap")
+      const lowR = Math.max(0, Math.min(1, (2600 - st.rpm) / 1300));
+      if (firing && E.rotary) fuel *= 1 - (P.port === 'bridge' ? 0.3 : 0) * lowR - (P.failApex ? 0.12 * lowR : 0);
       // pipocos: depois de fechar o acelerador vindo de carga alta, no corte de giro e no quickshift
       if (prev && prev.tps > 0.4 && st.tps < 0.1 && st.rpm > 0.3 * E.limit) this.popEnv = 1;
-      const o = exhaustOpen(P), popBase = 0.025 + 0.2 * o * o + (P.muffler === false ? 0.08 : 0);
+      // o rotativo sempre deixa gasolina sem queimar: pipoca bem mais no escape
+      const o = exhaustOpen(P), popBase = (0.025 + 0.2 * o * o + (P.muffler === false ? 0.08 : 0)) * (E.rotary ? 2 : 1) + (E.rotary ? 0.05 : 0);
       this.popEnv = Math.max(0, this.popEnv - dt / (1.4 + 0.8 * o));
       const rich = st.lambda < 0.92 ? 1.6 : 1;
       let pop = 0;
@@ -291,7 +342,7 @@ export class Sound {
         if (st.cut.qs > 0) pop = 0.55;
       }
       this.flap += ((st.rpm > E.snd.flapRpm && st.tps > 0.3 ? 1 : 0) - this.flap) * (1 - Math.exp(-dt / 0.25));
-      const load = Math.min(1.1, Math.max(0, st.pr) * 1.04);
+      const load = Math.min(1.5, Math.max(0, st.pr) * 1.04 * (1 + 0.3 * (st.boost || 0)));
       const cold = Math.max(0, Math.min(1, (60 - st.temp.coolant) / 40));
       this.set(p.rpm, st.rpm, 0.012);
       this.set(p.load, load, 0.012);
@@ -304,12 +355,12 @@ export class Sound {
       p.pop.setValueAtTime(pop, this.now());
       this.set(p.flap, this.flapVal(P), 0.05);
       p.misfire.setValueAtTime(firing ? P.failSpark : 0, this.now());
-      this.set(p.idleRough, 0.1 + 0.12 * cold + (P.failFilter ? 0.04 : 0), 0.2);
+      this.set(p.idleRough, 0.1 + 0.12 * cold + (P.failFilter ? 0.04 : 0) + (E.rotary && P.port === 'bridge' ? 0.22 : 0) + (P.failApex ? 0.12 : 0), 0.2);
       this.set(p.open, P.muffler === false ? 1.3 : o, 0.08);
       this.set(p.pipeLen, P.pipeLen ?? 1, 0.08);
     }
 
-    this.prev = { key: st.key, run: st.run, starter: st.starter, tps: st.tps, gear: st.gear };
+    this.prev = { key: st.key, run: st.run, starter: st.starter, tps: st.tps, gear: st.gear, ac: !!st.ac, heater: !!st.heater };
   }
 
   // nível do mix (RMS e pico) para conferir saturação

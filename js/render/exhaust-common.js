@@ -35,8 +35,9 @@ export function noiseDb(st, P) {
   if (!(st.running && !st.broken) && st.rpm < 50) return 0;
   const o = exhaustOpen(P);
   const load = Math.max(0, Math.min(1, st.pr)) * (st.comb > 0 ? 1 : 0.5);
-  let db = 60 + 18 * load + 16 * Math.min(1.1, st.rpm / E.limit) + 14 * o + (P.muffler === false ? 5 : 0) + (E.cyl === 2 ? 4 : E.cyl === 1 ? -7 : 0);
-  if (E.cyl === 4 && P.muffler !== false && o < 0.3) db -= 4 * (1 - flapOpen(st, P, E));
+  let db = 60 + 18 * load + 16 * Math.min(1.1, st.rpm / E.limit) + 14 * o + (P.muffler === false ? 5 : 0) + (E.car ? 0 : E.cyl === 2 ? 4 : E.cyl === 1 ? -7 : 0);
+  if (E.key === 'i4' && P.muffler !== false && o < 0.3) db -= 4 * (1 - flapOpen(st, P, E));
+  if (E.car) db += (E.turbo ? -7 : -3) + 4 * Math.min(1, st.boost || 0);   // escapamento de carro abafa mais
   return db;
 }
 export function flapOpen(st, P, E) {
@@ -49,7 +50,7 @@ export function flapOpen(st, P, E) {
 export class ExhaustInfo {
   constructor(g, x, y, w) {
     this.x = x; this.y = y; this.w = w;
-    const b = el('g', { 'data-comp': 'exhaustSys', 'clip-path': 'url(#viewClip)' }, g);
+    const b = this.g = el('g', { 'data-comp': 'exhaustSys', 'clip-path': 'url(#viewClip)' }, g);
     el('rect', { x, y, width: w, height: 104, rx: 12, fill: '#0d151e', stroke: '#263446' }, b);
     txt(b, x + 14, y + 24, 'Ruído estimado', { 'font-size': 12.5, fill: '#8da0b6' });
     this.db = txt(b, x + 14, y + 66, '—', { 'font-size': 34, 'font-weight': 800, fill: '#fff', 'font-family': 'var(--mono)' });
@@ -70,7 +71,7 @@ export class ExhaustInfo {
     const L = this.lines;
     L[0].textContent = P.muffler === false ? 'Sem silencioso' : `Abafamento ${Math.round((P.baffle ?? 1) * 100)}%`;
     L[1].textContent = `Tubos ${fmt(P.pipeLen ?? 1, 2)}×`;
-    L[2].textContent = E.cyl === 4 ? `Válvula ${flapOpen(st, P, E) ? 'aberta' : 'fechada'}${P.flap === 'auto' ? ' (auto)' : ''}` : E.cyl === 2 ? 'Tubos com cruzamento' : 'Um tubo só';
+    L[2].textContent = E.exhNote ? E.exhNote : E.cyl === 4 ? `Válvula ${flapOpen(st, P, E) ? 'aberta' : 'fechada'}${P.flap === 'auto' ? ' (auto)' : ''}` : E.cyl === 2 ? 'Tubos com cruzamento' : 'Um tubo só';
     L[3].textContent = (P.pipeLen ?? 1) > 1.05 ? 'Tubo longo: força no meio' : (P.pipeLen ?? 1) < 0.95 ? 'Tubo curto: força em cima' : '';
   }
 }

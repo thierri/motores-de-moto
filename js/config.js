@@ -3,6 +3,10 @@
 //   i4 – 4 cilindros em linha de superbike (inspirado na BMW S1000RR)
 //   v2 – V-Twin 45° (inspirado no Harley-Davidson Milwaukee-Eight 114)
 //   cg – monocilíndrico de 125 cc com varetas e carburador (inspirado na Honda CG 125 clássica)
+// Carros (car: true): arrefecimento a água com radiador e ventoinha, câmbio em H, pneus que patinam
+//   t4 – 4 cilindros em linha 2.0 turbo (inspirado no Golf GTI)
+//   b6 – 6 cilindros boxer 3.4 aspirado (inspirado no Porsche Boxster S)
+//   rx – Wankel de 2 rotores, 1,3 L (inspirado no Mazda RX-8)
 
 export const ENGINES = {
   i4: {
@@ -170,15 +174,197 @@ export const ENGINES = {
       flapRpm: 99999,
     },
   },
+  // ------------------------------------------------------------------ carros
+  t4: {
+    key: 't4', car: true,
+    name: '4 cilindros turbo',
+    title: 'Motor <em>4 cilindros turbo</em>',
+    sub: '2.0 turbo · 16 válvulas · injeção direta · inspirado no Golf GTI',
+    cyl: 4, valves: 16,
+    bore: 82.5, stroke: 92.8, rod: 144, ch: 30,
+    disp: 1.984, cr: 9.6,
+    J: 0.17,
+    idle: 800, limit: 6800, float: 7300, breakRpm: 7900,
+    shiftCam: null,
+    rpmMax: 8000,
+    thr: 2.8,
+    fric: [9, 0.0022, 2.5e-7],
+    starterT: 70, crankRpm: 260,
+    adv: { a: 6, b: 26, rpm: 5500, max: 32 },
+    lamRpm: 4500,
+    // torque com o turbo na pressão nominal; fora dela a física corrige pela densidade do ar
+    curveFull: [
+      [0, 250], [1000, 300], [1500, 340], [2000, 350], [4600, 350], [5000, 330], [5500, 297], [6200, 262],
+      [6800, 222], [7500, 170], [8500, 100],
+    ],
+    valve: {
+      full: { ivo: -8, ivc: 214, lift: 10 },
+      exh: { evo: 500, evc: 730, lift: 9.5 },
+    },
+    firing: { inline: [0, 540, 180, 360] },
+    order: { inline: '1-3-4-2' },
+    cylNames: ['1', '2', '3', '4'],
+    gearbox: {
+      primary: 1, ratios: [0, 3.77, 2.09, 1.47, 1.10, 0.87, 0.73], final: 3.24,
+      clutchMax: 480, slipper: 1, eff: 0.92,
+    },
+    bike: { m: 1420, r: 0.316, CdA: 0.70, crr: 0.012, rho: 1.2, grip: 0.62 },   // tração dianteira
+    egt: { idle: 380, load: 400, rpm: 120 },
+    exhausts: { stock: 'Original', sport: 'Esportivo', open: 'Direto' },
+    heat: 1.9, hot: 108, tempName: 'água',
+    cluster: 'car', speedMax: 280, dyno: { cv: 320, nm: 480 }, needFires: 3, kick: false, carb: false,
+    turbo: { boost: 1.2, spool: [800, 1700], lag: 0.55 },
+    vib: 'i4car', exhNote: 'Turbina no caminho: som abafado', sparkNote: 'Um cilindro sem faísca: o motor perde um quarto da força e treme na lenta.',
+    snd: {
+      prim: [0.32, 0.30, 0.31, 0.33], groups: null, coll: 0.9,
+      tail: [0.9, 0.7, 0.4],
+      pulse: { rise: 5, decay: 20, plat: 0.3, turb: 0.12, base: 0.2, baseLoad: 0.1, comb: 0.9, len: 240 },
+      boomQ: 1.8, boomMix: 1.0, radDiff: 1.2,
+      muf: [
+        { f: 420, flap: 0, boom: 62, gain: 0.5, gainFlap: 0, sat: 0.6, g: -0.3 },
+        { f: 1300, flap: 0, boom: 78, gain: 0.85, gainFlap: 0, sat: 0.9, g: -0.45 },
+        { f: 3200, flap: 0, boom: 95, gain: 1.15, gainFlap: 0, sat: 1.4, g: -0.58 },
+      ],
+      airbox: 130, inRun: 0.3, block: [140, 320, 900], ticks: [3200, 5200], tickAmp: [0.06, 0.12],
+      whine: [18, 0], whineAmp: [0.004, 0], idleVarRpm: 2500, rpmRef: 6800, mech: 0.4, out: 1.2,
+      flapRpm: 99999,
+    },
+  },
+
+  b6: {
+    key: 'b6', car: true,
+    name: 'Boxer 6',
+    title: 'Motor <em>boxer de 6 cilindros</em>',
+    sub: '3.4 aspirado · cilindros deitados e opostos · inspirado no Porsche Boxster S',
+    cyl: 6, valves: 24,
+    bore: 97, stroke: 78, rod: 145, ch: 30,
+    disp: 3.436, cr: 12.5,
+    J: 0.14,
+    idle: 750, limit: 7500, float: 7900, breakRpm: 8500,
+    shiftCam: null,
+    rpmMax: 9000,
+    thr: 5.6,
+    fric: [13, 0.003, 2.5e-7],
+    starterT: 95, crankRpm: 260,
+    adv: { a: 8, b: 26, rpm: 6500, max: 36 },
+    lamRpm: 5000,
+    curveFull: [
+      [0, 200], [1000, 250], [2000, 300], [3000, 330], [4000, 352], [4750, 360], [5500, 358], [6000, 348],
+      [6400, 340.5], [7000, 305], [7500, 272], [8500, 190], [9500, 110],
+    ],
+    valve: {
+      full: { ivo: -14, ivc: 222, lift: 11 },
+      exh: { evo: 494, evc: 738, lift: 10 },
+    },
+    // cilindros 1-2-3 de um lado e 4-5-6 do outro; os opostos (1-4, 2-5, 3-6) se movem juntos
+    firing: { boxer: [0, 240, 480, 360, 600, 120] },
+    order: { boxer: '1-6-2-4-3-5' },
+    cylNames: ['1', '2', '3', '4', '5', '6'],
+    gearbox: {
+      primary: 1, ratios: [0, 3.31, 1.95, 1.41, 1.13, 0.97, 0.82], final: 3.89,
+      clutchMax: 520, slipper: 1, eff: 0.92,
+    },
+    bike: { m: 1430, r: 0.33, CdA: 0.58, crr: 0.012, rho: 1.2, grip: 0.95 },   // motor central, tração traseira
+    egt: { idle: 360, load: 500, rpm: 140 },
+    exhausts: { stock: 'Original', sport: 'Esportivo', open: 'Direto' },
+    heat: 1.9, hot: 108, tempName: 'água',
+    cluster: 'car', speedMax: 300, dyno: { cv: 360, nm: 400 }, needFires: 3, kick: false, carb: false,
+    vib: 'boxer', exhNote: 'Um coletor para cada bancada', sparkNote: 'Um cilindro sem faísca: o seis perde o ritmo liso e o som fica manco.',
+    // som: cada bancada tem o próprio coletor, de comprimento e volume diferentes. As explosões de uma
+    // bancada vêm a cada 240° (ordem 1,5 do giro): é essa meia-ordem que dá a aspereza do seis boxer.
+    // Por cima, a admissão ressonante canta acima de ~4.500 rpm (o uivo).
+    snd: {
+      prim: [0.40, 0.46, 0.52, 0.44, 0.50, 0.56], groups: [{ cyl: [0, 1, 2], L: 0.42, g: 1 }, { cyl: [3, 4, 5], L: 0.56, g: 0.78 }], coll: 0.5,
+      tail: [0.6, 0.5, 0.3], cylGain: [1, 0.9, 1.06, 0.94, 1.05, 0.9],
+      pulse: { rise: 3, decay: 12, plat: 0.18, turb: 0.2, saw: 0.14, base: 0.24, baseLoad: 0.12, comb: 1.0, len: 250 },
+      boomQ: 1.6, boomMix: 0.7, radDiff: 2.2,
+      formants: [[430, 3, 0.8], [1150, 4.5, 1.2], [2500, 4, 0.9]], fmDry: 0.8,
+      zing: [[1500, 0.004, 0.03]],
+      howl: { f: 330, q: 5, gain: 2.4, rpm: [4200, 6200] }, inGain: 1.5,
+      muf: [
+        { f: 900, flap: 0, boom: 70, gain: 0.5, gainFlap: 0, sat: 0.6, g: -0.35 },
+        { f: 2600, flap: 0, boom: 88, gain: 0.85, gainFlap: 0, sat: 1.0, g: -0.5 },
+        { f: 5500, flap: 0, boom: 110, gain: 1.15, gainFlap: 0, sat: 1.5, g: -0.6 },
+      ],
+      airbox: 160, inRun: 0.25, block: [150, 340, 1000], ticks: [3500, 5600], tickAmp: [0.12, 0.2],
+      whine: [21, 0], whineAmp: [0.006, 0], idleVarRpm: 3000, rpmRef: 7500, mech: 0.35, out: 0.8,
+      flapRpm: 99999,
+    },
+  },
+
+  rx: {
+    key: 'rx', car: true,
+    name: 'Wankel',
+    title: 'Motor <em>Wankel</em> de 2 rotores',
+    sub: '1,3 L · rotativo, sem pistões nem válvulas · inspirado no Mazda RX-8',
+    cyl: 2, valves: 0,              // "cilindros" = rotores; cada rotor tem 3 câmaras
+    rotary: { R: 105, e: 15 },      // raio do rotor e excentricidade (mm)
+    firesPerRev: 2,                 // cada rotor explode uma vez por volta do eixo
+    bore: 100, stroke: 83, rod: 150, ch: 30,   // só para a curva de pressão (pistão equivalente)
+    disp: 1.308, cr: 10,
+    J: 0.085,
+    idle: 850, limit: 9000, float: 10200, breakRpm: 11000,
+    shiftCam: null,
+    rpmMax: 10000,
+    thr: 2.5,
+    fric: [8, 0.0015, 1e-7],
+    starterT: 60, crankRpm: 300,
+    adv: { a: 5, b: 22, rpm: 7500, max: 28 },
+    lamRpm: 6000,
+    curveFull: [
+      [0, 110], [1000, 140], [2000, 165], [3000, 182], [4000, 196], [5500, 211], [6500, 208], [7500, 203],
+      [8200, 198], [9000, 180], [10000, 140], [11500, 80],
+    ],
+    // janelas equivalentes (num ciclo de 720°), para a curva de pressão e para o som
+    valve: {
+      full: { ivo: -6, ivc: 228, lift: 10 },
+      exh: { evo: 486, evc: 732, lift: 10 },
+    },
+    firing: { rotary: [0, 180] },
+    order: { rotary: 'rotor 1 → 180° → rotor 2' },
+    cylNames: ['rotor 1', 'rotor 2'],
+    gearbox: {
+      primary: 1, ratios: [0, 3.76, 2.27, 1.65, 1.19, 1.0, 0.84], final: 4.44,
+      clutchMax: 330, slipper: 1, eff: 0.92,
+    },
+    bike: { m: 1350, r: 0.32, CdA: 0.62, crr: 0.012, rho: 1.2, grip: 0.85 },   // tração traseira
+    egt: { idle: 480, load: 430, rpm: 150 },   // o escape do rotativo é bem mais quente
+    exhausts: { stock: 'Original', sport: 'Esportivo', open: 'Direto' },
+    heat: 1.9, hot: 108, tempName: 'água',
+    cluster: 'car', speedMax: 280, dyno: { cv: 280, nm: 260 }, needFires: 3, kick: false, carb: false,
+    vib: 'rotary', exhNote: 'Janelas no lugar de válvulas', sparkNote: 'Um rotor sem faísca: o motor perde metade da força.',
+    // som: a janela de escape abre de uma vez, com o gás ainda em alta pressão, e fica aberta por muito
+    // tempo: o pulso é um dente de serra seco, cheio de harmônicos (o zumbido de "abelha brava"), com um
+    // anel metálico na aresta da janela. Sem válvulas, quase não há ruído mecânico. Os dois rotores têm
+    // tubos de comprimento diferente, o que deixa passar um pouco do ritmo de cada rotor.
+    snd: {
+      n: 4, off: [0, 180, 360, 540], units: 2,   // 2 rotores × 1 explosão por volta = ritmo de um 4 cilindros
+      prim: [0.36, 0.44, 0.36, 0.44], groups: [{ cyl: [0, 2], L: 0.26, g: 1 }, { cyl: [1, 3], L: 0.34, g: 0.86 }], coll: 0.45,
+      tail: [0.5, 0.36, 0.2],
+      pulse: { rise: 1.2, decay: 5, plat: 0.05, turb: 0.2, saw: 0.55, base: 0.34, baseLoad: 0.14, comb: 1.0, len: 250 },
+      boomQ: 1.6, boomMix: 0.4, radDiff: 2.4,
+      formants: [[700, 3, 0.9], [1700, 3.5, 1.4], [3400, 3, 0.8]], fmDry: 0.7,
+      zing: [[2600, 0.0025, 0.03], [4100, 0.0015, 0.012]],
+      muf: [
+        { f: 1400, flap: 0, boom: 75, gain: 0.5, gainFlap: 0, sat: 0.6, g: -0.35 },
+        { f: 4200, flap: 0, boom: 100, gain: 0.9, gainFlap: 0, sat: 1.0, g: -0.5 },
+        { f: 8000, flap: 0, boom: 130, gain: 1.2, gainFlap: 0, sat: 1.5, g: -0.62 },
+      ],
+      airbox: 210, inRun: 0.2, block: [200, 460, 1300], ticks: [4000, 6500], tickAmp: [0, 0.02],
+      whine: [9, 27], whineAmp: [0.012, 0.008], idleVarRpm: 3500, rpmRef: 9000, mech: 0.2, out: 0.9,
+      flapRpm: 99999,
+    },
+  },
 };
 
 // Mapas do acelerador eletrônico: curva da manopla → borboleta, rapidez e limite
 export const MODES = {
-  rain: { name: 'Chuva', exp: 1.8, tau: 0.12, max: 0.62 },
-  road: { name: 'Estrada', exp: 1.35, tau: 0.06, max: 1 },
-  dynamic: { name: 'Dinâmico', exp: 1.1, tau: 0.035, max: 1 },
-  race: { name: 'Corrida', exp: 1.0, tau: 0.018, max: 1 },
+  rain: { name: 'Chuva', car: 'Eco', exp: 1.8, tau: 0.12, max: 0.62 },
+  road: { name: 'Estrada', car: 'Normal', exp: 1.35, tau: 0.06, max: 1 },
+  dynamic: { name: 'Dinâmico', car: 'Esporte', exp: 1.1, tau: 0.035, max: 1 },
+  race: { name: 'Corrida', car: 'Pista', exp: 1.0, tau: 0.018, max: 1 },
 };
+export const modeName = (P) => { const m = MODES[P.mode] || MODES.road; return ENGINES[P.engine]?.car ? m.car : m.name; };
 
 // atalhos de ponteira: quanto o silencioso abafa (1 = original fechado, 0 = nada)
 export const EXH_PRESETS = { stock: 1, sport: 0.5, open: 0.12 };
@@ -208,7 +394,22 @@ export const DEFAULTS_BY = {
   v2: { ...COMMON, engine: 'v2', crank: 'v45', limit: 5800, idle: 850, cr: 10.5, shiftCam: 'full', qs: false },
   cg: { ...COMMON, engine: 'cg', crank: 'single', limit: 9500, idle: 1400, cr: 9.2, shiftCam: 'full', qs: false, dtc: false },
 };
+// carros: clima, arrefecimento e as falhas que fazem o motor ferver
+const CAR = {
+  ...COMMON, shiftCam: 'full', qs: false, dtc: true,
+  amb: 25,              // temperatura do ar (°C)
+  fan: 'auto',          // ventoinha: 'auto' | 'on' (ligada direto) | 'off' (queimada)
+  thermo: 'ok',         // válvula termostática: 'ok' | 'closed' (travada fechada) | 'open' (travada aberta)
+  revMatch: true,       // punta-tacco automático nas reduções
+  failLeak: false,      // vazamento de água
+  failRad: false,       // radiador obstruído
+  failBatt: false,      // bateria fraca
+};
+DEFAULTS_BY.t4 = { ...CAR, engine: 't4', crank: 'inline', limit: 6800, idle: 800, cr: 9.6, boost: 1.2, bov: 'atm' };
+DEFAULTS_BY.b6 = { ...CAR, engine: 'b6', crank: 'boxer', limit: 7500, idle: 750, cr: 12.5 };
+DEFAULTS_BY.rx = { ...CAR, engine: 'rx', crank: 'rotary', limit: 9000, idle: 850, cr: 10, port: 'stock', failApex: false, beep: true };
 export const DEFAULTS = DEFAULTS_BY.i4;
+export const CAR_KEYS = ['t4', 'b6', 'rx'], MOTO_KEYS = ['cg', 'v2', 'i4'];
 
 export const profile = (P) => ENGINES[(P && P.engine) || 'i4'];
 
