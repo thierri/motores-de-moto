@@ -9,6 +9,10 @@ import { ENGINES, profile } from '../config.js';
 import { cylPressure, intakeLift, exhaustLift, strokeOf } from '../sim/engine.js';
 import { V2View } from './scene-v2.js';
 import { CGView } from './scene-cg.js';
+import { T4View } from './scene-t4.js';
+import { B6View } from './scene-b6.js';
+import { RXView } from './scene-rx.js';
+import { CoolingView } from './scene-car.js';
 import { drawMuffler, mufKey, ExhaustInfo, ExhaustPlume, flapOpen } from './exhaust-common.js';
 import { wrapShake, Vibration } from './shake.js';
 
@@ -76,7 +80,19 @@ export class Scene {
     this.applyView();
   }
   setTab(tab) { this.tab = tab; this.applyView(); }
+  // câmera do vídeo: um viewBox [x, y, w, h] por cima da vista normal (null volta ao normal)
+  setCam(vb) {
+    this.cam = vb;
+    if (!vb) { this.applyView(); return; }
+    const s = vb.map((v) => v.toFixed(1)).join(' ');
+    if (s === this.camS) return;
+    this.camS = s;
+    this.svg.setAttribute('viewBox', s);
+    attr(this.clipR, { x: vb[0], y: vb[1], width: vb[2], height: vb[3] });
+  }
   applyView() {
+    this.camS = null;
+    if (this.cam) { const c = this.cam; this.cam = null; this.setCam(c); return; }
     const v2 = this.engine !== 'i4';
     const VIEWS = {
       motor: v2 ? '0 0 702 784' : '0 10 702 700',
@@ -99,7 +115,16 @@ export class Scene {
   resetFx() {
     if (this.vib) this.vib.reset();
     if (this.e && this.e.plume) this.e.plume.reset();
+    if (this.cars) { for (const k in this.cars) this.cars[k].resetFx(); this.cool.resetFx(); }
     this.flowIn = 0; this.flowEx = 0; this.chain = 0; this.oilPh = 0; this.waves = []; this.waveT = 0; this.lastTheta = null;
+  }
+
+  // vista 3D aberta para um motor: ela ocupa a cena inteira, então some todo o desenho 2D daquele motor,
+  // o arrefecimento e o quadro do escape (o painel de instrumentos, ao lado, continua)
+  set3d(key) {
+    this.in3d = key;
+    for (const k in this.gCar) this.gCar[k].style.visibility = k === key ? 'hidden' : '';
+    for (const g of [this.gCool, this.exInfo.g, ...this.dividers]) g.style.visibility = key ? 'hidden' : '';
   }
 
   setLayers(o) {
@@ -140,8 +165,8 @@ export class Scene {
     el('rect', { x: 0, y: 0, width: 1400, height: 784, fill: 'url(#grid)', class: 'bgx' }, svg);
 
     // divisórias discretas entre as regiões
-    el('line', { x1: 702, y1: 18, x2: 702, y2: 766, stroke: '#ffffff', 'stroke-opacity': 0.06 }, svg);
-    el('line', { x1: 716, y1: 534, x2: 1390, y2: 534, stroke: '#ffffff', 'stroke-opacity': 0.06 }, svg);
+    this.dividers = [el('line', { x1: 702, y1: 18, x2: 702, y2: 766, stroke: '#ffffff', 'stroke-opacity': 0.06 }, svg),
+      el('line', { x1: 716, y1: 534, x2: 1390, y2: 534, stroke: '#ffffff', 'stroke-opacity': 0.06 }, svg)];
 
     this.gI4 = el('g', {}, svg);
     const gf = el('g', {}, this.gI4), gs = el('g', {}, this.gI4);
@@ -156,6 +181,11 @@ export class Scene {
     this.v2 = new V2View(this, this.gV2);
     this.gCG = el('g', {}, svg);
     this.cg = new CGView(this, this.gCG);
+    // carros: um desenho por motor (região da esquerda e escapamento) e o arrefecimento, comum aos três
+    this.gCar = { t4: el('g', {}, svg), b6: el('g', {}, svg), rx: el('g', {}, svg) };
+    this.cars = { t4: new T4View(this, this.gCar.t4), b6: new B6View(this, this.gCar.b6), rx: new RXView(this, this.gCar.rx) };
+    this.gCool = el('g', {}, svg);
+    this.cool = new CoolingView(this, this.gCool);
     for (const c of svg.children) if (c.tagName !== 'defs') c.setAttribute('clip-path', 'url(#viewClip)');
     this.engine = null;
   }
@@ -452,6 +482,8 @@ export class Scene {
       this.gI4.style.display = P.engine === 'i4' ? '' : 'none';
       this.gV2.style.display = P.engine === 'v2' ? '' : 'none';
       this.gCG.style.display = P.engine === 'cg' ? '' : 'none';
+      for (const k in this.gCar) this.gCar[k].style.display = P.engine === k ? '' : 'none';
+      this.gCool.style.display = E.car ? '' : 'none';
       if (this.cyl >= E.cyl) this.cyl = 0;
       this.lastTheta = null;
       this.applyView();
@@ -460,6 +492,7 @@ export class Scene {
     this.vib.update(st, P, dt);
     if (P.engine === 'v2') { this.v2.update(st, P, dt); return; }
     if (P.engine === 'cg') { this.cg.update(st, P, dt); return; }
+    if (E.car) { this.cars[P.engine].update(st, P, dt); this.cool.update(st, P, dt); return; }
     this.vib.apply(this.shF, (F.x[1] + F.x[2]) / 2, F.yc);
     this.vib.apply(this.shS, T.x0, T.yc, 1.15);
 

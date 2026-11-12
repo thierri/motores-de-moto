@@ -23,9 +23,11 @@ export class Controls {
     root.innerHTML = `
       <div class="cgrp ign" data-spot="ign">
         <div class="cb"><button class="key${app.video ? '' : ' hint'}" id="btnKey" aria-label="Chave"><span class="kh"></span></button><label>Chave <kbd>I</kbd></label></div>
-        <div class="cb"><button class="kill" id="btnKill" aria-label="Corta-corrente"><span>RUN</span></button><label>Corta-corrente <kbd>K</kbd></label></div>
+        <div class="cb" id="killCb"><button class="kill" id="btnKill" aria-label="Corta-corrente"><span>RUN</span></button><label>Corta-corrente <kbd>K</kbd></label></div>
         <div class="cb"><button class="startb" id="btnStart" aria-label="Partida"><span>START</span></button><label id="startL">Partida <kbd>Enter</kbd></label></div>
         <div class="cb chokecb" id="chokeCb"><button class="chokeb" id="btnChoke" aria-label="Afogador"><span>AFOG.</span></button><label>Afogador <kbd>A</kbd></label></div>
+        <div class="cb chokecb" id="acCb"><button class="chokeb ac" id="btnAc" aria-label="Ar-condicionado"><span>A/C</span></button><label>Ar-cond. <kbd>K</kbd></label></div>
+        <div class="cb chokecb" id="heatCb"><button class="chokeb heat" id="btnHeat" aria-label="Ar quente"><span>QUENTE</span></button><label>Ar quente <kbd>A</kbd></label></div>
       </div>
       <div class="grip" id="grip" data-spot="grip">
         <div class="gl"><b>Acelerador</b><span id="gripV">0%</span></div>
@@ -34,7 +36,7 @@ export class Controls {
           <div class="hand" id="gripHand"><i></i><i></i><i></i><i></i><i></i></div>
         </div>
         <div class="gfoot">
-          <span class="keys"><kbd>↑</kbd> abre aos poucos · <kbd>Espaço</kbd> tudo · arraste a manopla</span>
+          <span class="keys"><kbd>↑</kbd> abre aos poucos · <kbd>Espaço</kbd> tudo · <span id="gripHint">arraste a manopla</span></span>
           <button class="tg" id="gripLock">Manter posição</button>
         </div>
       </div>
@@ -54,7 +56,10 @@ export class Controls {
       key: $('#btnKey'), kill: $('#btnKill'), start: $('#btnStart'), track: $('#gripTrack'), fill: $('#gripFill'), hand: $('#gripHand'),
       gv: $('#gripV'), lock: $('#gripLock'), gear: $('#gearV'), clutch: $('#btnClutch'), brake: $('#btnBrake'),
       choke: $('#btnChoke'), chokeCb: $('#chokeCb'), startL: $('#startL'),
+      killCb: $('#killCb'), ac: $('#btnAc'), acCb: $('#acCb'), heat: $('#btnHeat'), heatCb: $('#heatCb'), gripHint: $('#gripHint'),
     };
+    this.e.ac.addEventListener('click', () => app.setAc(!app.st.ac));
+    this.e.heat.addEventListener('click', () => app.setHeater(!app.st.heater));
     this.e.key.addEventListener('click', () => app.setKey(!app.st.key));
     this.e.kill.addEventListener('click', () => app.setRun(!app.st.run));
     // partida elétrica: segurar; pedal (CG): cada toque é uma pedalada
@@ -113,12 +118,12 @@ export class Controls {
       if (k) { if (k === 'start' && !e.repeat) this.app.kick(); this.kb[k] = true; e.preventDefault(); return; }
       if (e.repeat) return;
       if (e.code === 'KeyI') this.app.setKey(!this.app.st.key);
-      else if (e.code === 'KeyK') this.app.setRun(!this.app.st.run);
+      else if (e.code === 'KeyK') { if (profile(this.app.P).car) this.app.setAc(!this.app.st.ac); else this.app.setRun(!this.app.st.run); }
       else if (e.code === 'KeyE' || e.code === 'PageUp') this.app.shift(1);
       else if (e.code === 'KeyQ' || e.code === 'PageDown') this.app.shift(-1);
       else if (e.code === 'KeyN') this.app.shift(0);
       else if (e.code === 'KeyM') this.app.cycleMode();
-      else if (e.code === 'KeyA') this.app.setChoke(!this.app.st.choke);
+      else if (e.code === 'KeyA') { if (profile(this.app.P).car) this.app.setHeater(!this.app.st.heater); else this.app.setChoke(!this.app.st.choke); }
       else if (e.code === 'KeyO') this.app.setListen(this.app.sound.listen === 'rear' ? 'rider' : 'rear');
       else if (e.code === 'KeyL') this.setLock(!this.lock);
     });
@@ -194,11 +199,16 @@ export class Controls {
     if (this.eng !== P.engine) {
       this.eng = P.engine;
       e.chokeCb.style.display = E.carb ? '' : 'none';
-      this.root.querySelector('.cgrp').classList.toggle('four', !!E.carb);
+      e.killCb.style.display = E.car ? 'none' : '';
+      e.acCb.style.display = e.heatCb.style.display = E.car ? '' : 'none';
+      e.gripHint.textContent = E.car ? 'arraste o pedal' : 'arraste a manopla';
+      this.root.querySelector('.cgrp').classList.toggle('four', !!E.carb || !!E.car);
       e.start.querySelector('span').textContent = E.kick ? 'PEDAL' : 'START';
       e.startL.innerHTML = E.kick ? 'Pedal de partida <kbd>Enter</kbd>' : 'Partida <kbd>Enter</kbd>';
     }
     e.choke.classList.toggle('on', !!st.choke);
+    e.ac.classList.toggle('on', !!st.ac);
+    e.heat.classList.toggle('on', !!st.heater);
     if (E.kick) e.start.classList.toggle('on', st.kickT > 0.25);
   }
 }

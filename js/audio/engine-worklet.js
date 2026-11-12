@@ -85,7 +85,7 @@ class EngineProcessor extends AudioWorkletProcessor {
     return [
       p('rpm', 0, 0, 20000), p('load', 0, 0, 2), p('fuel', 0), p('throttle', 0), p('cam', 0),
       p('egt', 300, 0, 1200), p('knock', 0), p('float', 0), p('pop', 0), p('flap', 0),
-      p('misfire', 0, 0, 4), p('idleRough', 0.1), p('open', 0, 0, 1.5), p('pipeLen', 1, 0.5, 2),
+      p('misfire', 0, 0, 8), p('idleRough', 0.1), p('open', 0, 0, 1.5), p('pipeLen', 1, 0.5, 2),
     ];
   }
 
@@ -129,6 +129,16 @@ class EngineProcessor extends AudioWorkletProcessor {
     this.tick2 = new Ring(c.ticks[1], 0.00035, sr);
     this.mufO = -1; this.blockRpm = -1;
     this.pops = [];
+    // timbre próprio de cada motor (opcional no perfil):
+    //   formants – ressonâncias fixas do escape [Hz, Q, ganho], somadas ao som direto (fmDry)
+    //   zing     – "anéis" metálicos excitados a cada explosão [Hz, decaimento s, ganho] (aresta da janela, coletor)
+    //   howl     – ressonância da admissão que canta numa faixa de giro { f, q, gain, rpm: [de, até] }
+    this.fm = (c.formants || []).map(([f, q, g]) => { const b = new Biquad(); b.set('bp', f, q, sr); return { b, g }; });
+    this.zing = (c.zing || []).map(([f, d, g]) => ({ r: new Ring(f, d, sr), g }));
+    this.howl = c.howl ? new Biquad() : null;
+    if (this.howl) this.howl.set('bp', c.howl.f, c.howl.q, sr);
+    this.howl2 = c.howl ? new Biquad() : null;
+    if (this.howl2) this.howl2.set('bp', c.howl.f * 2, c.howl.q, sr);
   }
 
   rnd() { this.seed = (Math.imul(this.seed, 1664525) + 1013904223) >>> 0; return this.seed / 4294967296; }
@@ -181,6 +191,9 @@ class EngineProcessor extends AudioWorkletProcessor {
     const D3 = C.coll * k2, Dt = M.tail * 2 / c * sr, Di = 2 * C.inRun / 343 * sr;
     const gP = -0.62, gS = -0.5, gC = -0.42, gT = M.g;
     const mufGain = M.gain + M.gainFlap * flap;
+    const fmOpen = 0.45 + 0.55 * Math.min(1, P.open[0]);
+    const HW = C.howl;
+    const howlW = HW ? Math.max(0, Math.min(1, (rpmT - HW.rpm[0]) / (HW.rpm[1] - HW.rpm[0]))) * (0.25 + 0.75 * thr) * HW.gain : 0;
     const sat = M.sat;
     const pv = this.pv;
 
@@ -198,7 +211,7 @@ class EngineProcessor extends AudioWorkletProcessor {
       this.phi += dphi;
       if (this.phi >= 720) this.phi -= 720;
 
-      let intake = 0, mech = 0;
+      let intake = 0, mech = 0, zk = 0;
       for (let k = 0; k < N; k++) {
         const cy = this.cyl[k];
         const a0 = ((prevPhi - off[k]) % 720 + 720) % 720;
@@ -206,11 +219,12 @@ class EngineProcessor extends AudioWorkletProcessor {
         // abertura do escape: nasce o pulso
         if (a0 < C.evo && a1 >= C.evo && dphi > 0) {
           const idleVar = rough * Math.max(0, 1 - this.rpm / C.idleVarRpm);
-          const burn = fuel > 0 && this.rnd() < fuel && (k + 1) !== mis && !(flt > 0 && this.rnd() < flt * 0.5);
+          const burn = fuel > 0 && this.rnd() < fuel && ((C.units ? k % C.units : k) + 1) !== mis && !(flt > 0 && this.rnd() < flt * 0.5);
           const jit = 1 + this.gauss() * (0.04 + idleVar);
           cy.burn = burn;
-          cy.A = (PU.base + PU.baseLoad * load) + (burn ? load * PU.comb * jit : 0);
+          cy.A = ((PU.base + PU.baseLoad * load) + (burn ? load * PU.comb * jit : 0)) * (C.cylGain ? C.cylGain[k] : 1);
           cy.d = 0;
+          if (burn) zk += cy.A;
           // pipoco: combustível que sobra queima no escape quando não houve explosão
           if (!burn && popP > 0 && this.rnd() < popP) {
             this.pops.push({ t: 0, len: (0.002 + this.rnd() * 0.006) * sr, A: (0.8 + this.rnd() * 2.2), lp: 0, k: 0.15 + this.rnd() * 0.5 });
@@ -230,7 +244,7 @@ class EngineProcessor extends AudioWorkletProcessor {
           const d = cy.d;
           const spike = d < PU.rise ? d / PU.rise : Math.exp(-(d - PU.rise) / PU.decay);
           const turb = 1 + PU.turb * (this.rnd() * 2 - 1) * (cy.burn ? 1 : 0.4);
-          p = cy.A * (spike * turb + PU.plat * Math.sin(Math.PI * d / PU.len));
+          p = cy.A * (spike * turb + PU.plat * Math.sin(Math.PI * d / PU.len) + (PU.saw ? PU.saw * (1 - d / PU.len) * turb : 0));
           cy.d += dphi;
         }
         pv[k] = p;
@@ -250,7 +264,7 @@ class EngineProcessor extends AudioWorkletProcessor {
           const G = C.groups[g];
           let x = 0;
           for (const k of G.cyl) x += pv[k];
-          mix += this.sec[g].run(0.6 * x, G.L * k2, gS, 0.4);
+          mix += this.sec[g].run(0.6 * x, G.L * k2, gS, 0.4) * (G.g ?? 1);
         }
         mix *= 0.62;
       } else {
@@ -258,6 +272,7 @@ class EngineProcessor extends AudioWorkletProcessor {
         mix *= 0.75;
       }
       let col = this.coll.run(mix, D3, gC, 0.35);
+      for (const z of this.zing) { if (zk) z.r.y1 += zk * z.g; col += z.r.run(0); }
       // pipocos entram depois dos coletores
       for (let i = this.pops.length - 1; i >= 0; i--) {
         const q = this.pops[i];
@@ -268,7 +283,14 @@ class EngineProcessor extends AudioWorkletProcessor {
       }
       // silencioso
       let m = this.tail.run(col, Dt, gT, 0.5);
+      const mIn = m;
       m = this.mufLp2.run(this.mufLp.run(m)) + this.mufBoom.run(m) * (C.boomMix ?? 0.6);
+      if (this.fm.length) {
+        // os formantes ouvem o som de antes do silencioso; quanto mais aberto o escape, mais eles aparecem
+        let a = 0;
+        for (const f of this.fm) a += f.b.run(mIn) * f.g;
+        m = m * (C.fmDry ?? 1) + a * fmOpen;
+      }
       // radiação na ponta do tubo ~ derivada da vazão
       const rad = 0.55 * m + (C.radDiff ?? 2.2) * (m - this.lastMuf);
       this.lastMuf = m;
@@ -282,7 +304,9 @@ class EngineProcessor extends AudioWorkletProcessor {
       const ir = this.inRun.run(intake, Di, -0.55, 0.5);
       const box = this.airbox.run(ir) * 2.2;
       const hissN = this.hiss.run(this.rnd() * 2 - 1) * (-intake) * (0.25 + 0.6 * thr);
-      ia[s] = this.inLp.run(box * (0.4 + 0.6 * thr) + hissN * (0.5 + this.rpm / (C.rpmRef * 0.65))) * (0.6 + 0.4 * cam);
+      let iv = this.inLp.run(box * (0.4 + 0.6 * thr) + hissN * (0.5 + this.rpm / (C.rpmRef * 0.65))) * (0.6 + 0.4 * cam);
+      if (this.howl) iv += (this.howl.run(ir) + 0.6 * this.howl2.run(ir)) * howlW;
+      ia[s] = iv * (C.inGain ?? 1);
 
       // ---------- mecânica ----------
       let mx = 0;

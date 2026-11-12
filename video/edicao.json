@@ -1,0 +1,161 @@
+{
+  "_leia": "Lista de edição do vídeo. Tempos em segundos do áudio original (narracao.m4a), tirados da transcrição com tempo por palavra (video/build/palavras.json). Depois de mudar algo aqui, rode: python3 -I video/tools/build.py --916",
+  "audio": "narracao.m4a",
+  "inicio": 2.3,
+  "fim": 405.9,
+  "pausas": {
+    "maxima": 0.9,
+    "alvo": 0.6,
+    "limite_db": -42,
+    "manter": [
+      [
+        20.5,
+        1.2
+      ],
+      [
+        71.0,
+        0.8
+      ],
+      [
+        97.0,
+        1.0
+      ],
+      [
+        112.0,
+        3.0
+      ],
+      [
+        137.0,
+        2.0
+      ],
+      [
+        175.5,
+        9
+      ],
+      [
+        195.0,
+        1.2
+      ],
+      [
+        205.0,
+        2.2
+      ],
+      [
+        214.0,
+        4.0
+      ],
+      [
+        364.0,
+        2.2
+      ]
+    ]
+  },
+  "cortes": [
+    {
+      "de": 30.05,
+      "ate": 33.9,
+      "motivo": "repetição: 1ª tentativa de 'E tudo isso roda no seu navegador, dá para você acessar no seu…'"
+    },
+    {
+      "de": 61.85,
+      "ate": 64.05,
+      "motivo": "erro: 'deixa eu colocar carburador' (fica 'O motor está frio. Igual na vida real.')"
+    },
+    {
+      "de": 116.4,
+      "ate": 117.45,
+      "motivo": "troca de palavra: 'um pedal com' (era o painel); fica 'E aqui tem um velocímetro e conta-giro'"
+    },
+    {
+      "de": 138.3,
+      "ate": 139.85,
+      "motivo": "falso começo: 'Escuta' antes de 'Olha essa clássica lenta'"
+    },
+    {
+      "de": 145.85,
+      "ate": 147.8,
+      "motivo": "repetição: 'E repara que o motor' dito duas vezes"
+    },
+    {
+      "de": 185.74,
+      "ate": 186.8,
+      "motivo": "repetição: 'sem sem precisar da embreagem'"
+    },
+    {
+      "de": 286.15,
+      "ate": 294.45,
+      "motivo": "repetição: 1ª tentativa de 'e a BMW tem 4. Uma explosão a cada meia volta. É por isso que ela…'"
+    },
+    {
+      "de": 303.3,
+      "ate": 320.4,
+      "motivo": "repetição: 1ª tentativa de 'Na Harley, os dois cilindros ficam em V… Uma depois de 300 e…'"
+    },
+    {
+      "de": 379.55,
+      "ate": 382.7,
+      "motivo": "repetição: 'Se uma vela falhar' dito duas vezes"
+    }
+  ],
+  "volume_maquina_db": -3,
+  "antecipar": 0.35,
+  "final": 2.5,
+  "cenas": [
+    {
+      "cena": 0,
+      "inicio": 2.5
+    },
+    {
+      "cena": 1,
+      "inicio": 47.08
+    },
+    {
+      "cena": 2,
+      "inicio": 80.16
+    },
+    {
+      "cena": 3,
+      "inicio": 100.32
+    },
+    {
+      "cena": 4,
+      "inicio": 129.1
+    },
+    {
+      "cena": 5,
+      "inicio": 166.46
+    },
+    {
+      "cena": 6,
+      "inicio": 197.96
+    },
+    {
+      "cena": 7,
+      "inicio": 242.34
+    },
+    {
+      "cena": 8,
+      "inicio": 272.88
+    },
+    {
+      "cena": 9,
+      "inicio": 320.5
+    },
+    {
+      "cena": 10,
+      "inicio": 345.92
+    },
+    {
+      "cena": 11,
+      "inicio": 367.42
+    },
+    {
+      "cena": 12,
+      "inicio": 382.75
+    },
+    {
+      "cena": 13,
+      "inicio": 393.88
+    }
+  ]
+}

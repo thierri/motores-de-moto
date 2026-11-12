@@ -44,9 +44,15 @@ kbd { font-family: var(--mono); font-size: 11px; background: #0d151e; border: 1p
 .brand { display: flex; align-items: baseline; gap: 12px; white-space: nowrap; }
 .brand b { font-size: 21px; letter-spacing: .2px; }
 .brand b em { font-style: normal; color: var(--orange); }
-.brand span { font-size: 12px; color: var(--muted); max-width: 300px; white-space: normal; line-height: 1.2; }
+.brand span { font-size: 12px; color: var(--muted); max-width: 250px; white-space: normal; line-height: 1.2; }
+.bwrap { display: flex; align-items: center; gap: 14px; }
+/* abas Motos / Carros */
+.catsel { display: flex; flex-direction: column; gap: 3px; }
+.catsel button { height: 24px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line2); background: transparent;
+  font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.catsel button.on { background: var(--orange); border-color: #ffb066; color: #14100a; }
 .brand b { white-space: nowrap; }
-.engsel { margin-left: 16px; display: flex; gap: 6px; }
+.engsel { margin-left: 2px; display: flex; gap: 6px; }
 .engsel button { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 16px 0 10px; border-radius: 12px; border: 1px solid var(--line2);
   background: transparent; font-size: 16px; font-weight: 700; white-space: nowrap; color: var(--muted); }
 .engsel button.on { background: #1f4d80; border-color: #3c7cc0; color: #fff; }
@@ -87,6 +93,25 @@ input[type=range] { accent-color: var(--accent); }
   background: #2a2410f2; border: 1px solid #8a6a1c; color: #ffe2a0; border-radius: 12px; padding: 9px 18px; font-size: 15px; text-align: center; pointer-events: none; }
 #toast.show { display: block; }
 
+/* ---------- vista 3D ---------- */
+#view3d { position: absolute; display: none; z-index: 2; overflow: hidden; }
+.f169 #view3d { left: 0; top: 0; width: 1400px; height: 784px; }
+.f916 #view3d { left: 0; top: 84px; width: 1080px; height: 786px; }
+#view3d canvas { position: absolute; left: 0; top: 0; display: block; }
+#btn3d { position: absolute; z-index: 3; left: 24px; top: 78px; height: 34px; }
+.f916 #btn3d { left: 16px; top: 100px; height: 54px; font-size: 23px; padding: 0 20px; border-radius: 14px; }
+.v3bar { position: absolute; left: 150px; top: 78px; right: 14px; display: flex; align-items: center; gap: 6px; z-index: 1; pointer-events: none; }
+.v3bar b { font-size: 16px; margin-right: auto; }
+.v3bar button { pointer-events: auto; background: #0d151ecc; }
+.v3bar button.on { background: #1d3550; }
+.v3hint { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 12.5px; color: var(--muted); pointer-events: none; }
+.v3msg { position: absolute; left: 0; right: 0; top: 46%; text-align: center; font-size: 16px; color: var(--yellow); pointer-events: none; }
+.f916 .v3bar { left: 16px; top: 80px; right: 16px; gap: 10px; }
+.f916 .v3bar b { font-size: 26px; }
+.f916 .v3bar button { height: 48px; font-size: 22px; padding: 0 18px; border-radius: 24px; }
+.f916 .v3hint { font-size: 21px; bottom: 18px; }
+.f916 .v3msg { font-size: 26px; }
+
 /* ---------- painel ---------- */
 #panel { background: var(--bg2); border-left: 1px solid var(--line); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; }
@@ -107,6 +132,8 @@ input[type=range] { accent-color: var(--accent); }
 .lt { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); background: #0d151e;
   border: 1px solid var(--line); border-radius: 8px; padding: 5px 6px; line-height: 1.1; }
 .lt i { flex: none; width: 11px; height: 11px; border-radius: 50%; background: #26313d; border: 1px solid #0006; }
+.lights.six { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 6px 8px; }
+.lights.six .lt { padding: 4px 6px; min-width: 0; font-size: 10.5px; white-space: nowrap; }
 .lt.on { color: #fff; }
 .lt.on.g i { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
 .lt.on.y i { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
@@ -137,6 +164,11 @@ input[type=range] { accent-color: var(--accent); }
 .chokeb span { font-weight: 800; font-size: 13px; color: #8a9bb0; }
 .chokeb.on { border-color: var(--yellow); box-shadow: 0 0 16px #f2b63255; }
 .chokeb.on span { color: var(--yellow); }
+.chokeb.ac.on { border-color: #4fa3ff; box-shadow: 0 0 16px #4fa3ff55; }
+.chokeb.ac.on span { color: #8cc4ff; }
+.chokeb.heat.on { border-color: var(--orange); box-shadow: 0 0 16px #f08a2c55; }
+.chokeb.heat.on span { color: var(--orange); }
+.chokeb.heat span { font-size: 11.5px; }
 .f916 .chokeb { width: 84px; height: 84px; }
 
 .grip { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; display: flex; flex-direction: column; justify-content: space-between; }
@@ -206,6 +238,12 @@ input[type=range] { accent-color: var(--accent); }
 .f916 .brand span, .f916 .layers, .f916 .legend, .f916 #vol { display: none; }
 .f916 .brand b { font-size: 34px; }
 .f916 .engsel { margin-left: 0; }
+.f916 .bwrap { flex-direction: column; align-items: flex-start; gap: 6px; }
+.f916 .catsel { flex-direction: row; gap: 6px; }
+.f916 .catsel button { height: 40px; font-size: 21px; padding: 0 14px; border-radius: 12px; }
+.f916 .lights.six { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.f916 .lights.six .lt { font-size: 15px; padding: 7px 6px; gap: 6px; white-space: normal; }
+.f916 .lights.six .lt i { width: 15px; height: 15px; }
 .f916 .engsel button { font-size: 22px; height: 84px; padding: 0 12px; flex-direction: column; gap: 0; justify-content: center; }
 .f916 .engsel .mi { width: 70px; height: 38px; }
 .f916 .brand b { font-size: 28px !important; }
@@ -272,3 +310,26 @@ input[type=range] { accent-color: var(--accent); }
 .f916 .sw.on::after { left: 34px; }
 .f916 .pbtns .btn { font-size: 25px; height: 70px; padding: 0 26px; }
 .f916 #audioGate { left: 540px; top: 640px; font-size: 30px; padding: 22px 30px; }
+
+/* ---------- modo apresentação / vídeo ---------- */
+#caption { position: absolute; display: none; z-index: 12; background: #0c131b; border: 1px solid var(--line2);
+  border-radius: 12px; padding: 16px 20px; box-sizing: border-box; }
+#caption.show { display: block; }
+#caption .ct { font-size: 22px; font-weight: 700; color: var(--yellow); margin-bottom: 8px; }
+#caption .cx { font-size: 18px; line-height: 1.45; color: #e1e9f1; }
+#spot { position: absolute; z-index: 25; display: none; border: 3px solid var(--yellow); border-radius: 14px;
+  box-shadow: 0 0 0 4000px #0007, 0 0 24px #f2b63288; pointer-events: none; }
+#spot.show { display: block; }
+#linkBadge { position: absolute; z-index: 13; display: none; background: #f2b632; color: #111; border-radius: 12px;
+  padding: 10px 22px; font-weight: 800; text-align: center; white-space: nowrap; box-shadow: 0 6px 24px #0008; }
+#linkBadge.show { display: block; }
+#linkBadge small { display: block; font-size: 13px; font-weight: 600; opacity: .75; }
+.f169 #linkBadge { left: 50%; top: 76px; transform: translateX(-50%); font-size: 26px; }
+.f916 #linkBadge { left: 50%; top: 250px; transform: translateX(-50%); font-size: 36px; }
+.f916 #linkBadge small { font-size: 19px; }
+#presHint { position: absolute; z-index: 14; left: 50%; bottom: 24px; transform: translateX(-50%); display: none;
+  background: #000c; color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 15px; white-space: nowrap; }
+#presHint.show { display: block; }
+#presHint kbd { font-family: var(--mono); border: 1px solid #fff4; border-radius: 4px; padding: 0 5px; margin: 0 2px; }
+.f916 #presHint { font-size: 22px; white-space: normal; width: 90%; text-align: center; }
+#stage.pres #audioGate { display: none; }

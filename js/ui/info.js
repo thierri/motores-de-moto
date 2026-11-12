@@ -116,6 +116,102 @@ const T3 = {
 };
 const DEFAULT3 = ['Como usar', 'Ligue a chave (I). Com o motor frio, ligue o afogador (A) e dê pedaladas (Enter ou o botão Pedal) até pegar. Depois que esquentar, desligue o afogador. Para andar: embreagem (C), 1ª (Q) e solte a embreagem acelerando. Clique em qualquer peça.'];
 
+// ---------- carros ----------
+// textos comuns aos três (arrefecimento, turbo, peças básicas); cada motor sobrepõe os seus
+const TC = {
+  piston: ['Pistão', 'Recebe a força da explosão e a passa para a biela. Num motor de carro ele tem curso mais longo que o de uma superbike: gira menos, mas empurra com mais força em baixa rotação.'],
+  rod: ['Biela', 'Liga o pistão ao virabrequim e transforma o vai e vem em giro.'],
+  crank: ['Virabrequim', 'O eixo que gira e leva a força para o câmbio. Na ponta dele vai o volante, um disco pesado que deixa a rotação mais lisa e onde a embreagem encosta.', (s) => `${fmtInt(s.rpm)} rpm`],
+  bearing: ['Mancais', 'Apoios do virabrequim. O eixo gira sobre uma película de óleo sob pressão e quase não encosta no metal.', (s) => `óleo ${fmt(s.oilP, 1)} bar`],
+  cylinder: ['Cilindro', 'O tubo onde o pistão corre. Clique num cilindro para ver a pressão dele no painel.'],
+  chamber: ['Câmara de combustão', 'A cor mostra a pressão do gás: azul é vácuo na admissão, vermelho é a explosão.'],
+  head: ['Cabeçote', 'A tampa dos cilindros, com as válvulas, os comandos e as velas. É a peça que mais sofre quando o motor ferve: o alumínio empena e a junta queima.'],
+  block: ['Bloco', 'O corpo do motor. Em volta dos cilindros há canais por onde corre a água de arrefecimento.', (s) => `água ${Math.round(s.temp.coolant)} °C`],
+  crankcase: ['Cárter', 'A parte de baixo do motor, onde gira o virabrequim e fica o óleo.'],
+  oil: ['Óleo', 'Lubrifica e também ajuda a tirar calor de dentro do motor. Frio, ele é grosso e a pressão sobe; quente demais, afina e protege menos.', (s) => `${fmt(s.oilP, 1)} bar · ${Math.round(s.temp.oil)} °C`],
+  camIn: ['Comando de admissão', 'Eixo com ressaltos que abrem as válvulas de admissão. Gira na metade da rotação do virabrequim.'],
+  camEx: ['Comando de escape', 'O mesmo, para as válvulas de escape.'],
+  valveIn: ['Válvulas de admissão', 'Abrem para o ar entrar enquanto o pistão desce.'],
+  valveEx: ['Válvulas de escape', 'Abrem para o gás queimado sair. É desse sopro que nasce o som do escapamento.'],
+  spark: ['Vela', 'Solta a faísca um pouco antes de o pistão chegar em cima. Se o motor começa a detonar, a central atrasa a faísca para protegê-lo.',
+    (s) => `avanço ${fmt(s.adv, 0)}° antes do PMS${s.retard > 0.2 ? ` (−${fmt(s.retard, 1)}° pelo sensor)` : ''}`],
+  intake: ['Admissão', 'O caminho do ar até os cilindros. A cor mostra a pressão: azul é vácuo (borboleta fechada).', (s) => `${Math.round(s.map * 101.3)} kPa`],
+  throttle: ['Borboleta', 'O disco que regula quanto ar entra. O pedal manda um sinal e um motor elétrico gira a borboleta.', (s) => `pedal ${Math.round(s.input.grip * 100)}% → borboleta ${Math.round(s.tps * 100)}%`],
+  airbox: ['Filtro de ar', 'Segura a poeira antes de o ar entrar no motor.'],
+  filter: ['Filtro de ar', 'Entupido, ele restringe o ar e o motor perde força em alta rotação.'],
+  header: ['Coletor de escape', 'Leva o gás queimado para fora. A cor mostra a temperatura.', (s) => `${Math.round(s.temp.egt)} °C`],
+  exhaustSys: ['Escapamento', 'Os tubos de cada cilindro se juntam e seguem até o silencioso, lá atrás. O comprimento dos tubos afina o som.'],
+  muffler: ['Silencioso', 'Abafa o som. O original é grande e cheio de câmaras; o esportivo deixa passar mais ronco; o direto quase não abafa.'],
+  // arrefecimento
+  coolant: ['Água de arrefecimento', 'Só um terço da energia da gasolina vira movimento; outro terço vira calor nas paredes do motor. A água (com aditivo) passa em volta dos cilindros e leva esse calor embora. A cor mostra a temperatura.',
+    (s) => `motor ${Math.round(s.temp.coolant)} °C · radiador ${Math.round(s.temp.rad)} °C`],
+  radiator: ['Radiador', 'Centenas de tubinhos finos com aletas. A água quente entra por cima, perde calor para o ar que atravessa a colmeia e sai fria por baixo. Na estrada o próprio vento resolve; parado, só a ventoinha.',
+    (s) => `${Math.round(s.temp.rad)} °C · ar ${Math.round(s.temp.amb)} °C · vento ${Math.round(s.v * 3.6)} km/h`],
+  fan: ['Ventoinha', 'Um ventilador elétrico atrás do radiador. Parado no trânsito não há vento, então a central liga a ventoinha quando a água passa de 98 °C e desliga quando ela volta a 91 °C. Acima de 105 °C entra a segunda velocidade. Com o ar-condicionado ligado ela fica ligada.',
+    (s) => (s.fan && s.key ? (s.fanSpd > 1.2 ? 'ligada na 2ª velocidade' : 'ligada') : 'desligada')],
+  thermostat: ['Válvula termostática', 'Uma válvula com cera dentro. Fria, ela fica fechada e a água circula só dentro do motor, para ele esquentar depressa. Perto de 88 °C a cera derrete, expande e abre a passagem para o radiador.',
+    (s) => `aberta ${Math.round(s.thermo * 100)}%`],
+  waterPump: ['Bomba d\'água', 'Empurra a água pelo motor e pelo radiador. É girada pelo próprio motor: quanto mais giro, mais água circula.'],
+  hoses: ['Mangueiras do radiador', 'A de cima leva a água quente do motor para o radiador; a de baixo traz a água já resfriada de volta para a bomba.'],
+  bypass: ['Desvio', 'Com a termostática fechada, a água volta direto para a bomba sem passar pelo radiador. É assim que o motor esquenta rápido.'],
+  expTank: ['Reservatório de expansão', 'A água quente ocupa mais espaço; o excesso vai para este reservatório. O sistema é pressurizado, e por isso a água só ferve perto de 120 °C. Se ferver, o vapor sai por aqui e o nível cai.',
+    (s) => `nível ${Math.round(s.coolLvl * 100)}%`],
+  heaterCore: ['Ar quente', 'Um radiador pequeno dentro do painel: o ar da cabine passa por ele e esquenta. Truque de emergência: se o motor estiver superaquecendo, ligar o ar quente no máximo ajuda a tirar calor da água.',
+    (s) => (s.heater ? 'ligado: tirando calor do motor' : 'desligado')],
+};
+
+const T_T4 = {
+  cylinder: ['Cilindro', 'São 4 em linha, com 82,5 mm de diâmetro e 92,8 mm de curso. Clique num cilindro para ver a pressão dele no painel.'],
+  chamber: ['Câmara de combustão', 'A cor mostra a pressão. Com o turbo soprando, o cilindro já começa a compressão com o dobro do ar, e a explosão passa de 100 bar.'],
+  injector: ['Injeção direta', 'O bico pulveriza a gasolina dentro do cilindro, a mais de 100 bar. A gasolina evaporando esfria a mistura, e é isso que deixa o motor turbo usar bastante pressão sem detonar.',
+    (s) => `λ ${fmt(s.lambda, 2)} · ${fmt(s.fuelLh, 1)} L/h`],
+  turbine: ['Turbina (lado quente)', 'O gás de escape, que iria embora, gira esta roda a mais de 150.000 rpm. Ela fica vermelha de quente em uso forte. Abaixo de ~1.500 rpm quase não há gás para girá-la: é o "lag" do turbo.',
+    (s) => `${fmtInt(Math.round(s.spool * 170) * 1000)} rpm · gás a ${Math.round(s.temp.egt)} °C`],
+  compressor: ['Compressor (lado frio)', 'No mesmo eixo da turbina, esta roda puxa o ar do filtro e o empurra comprimido para o motor. Mais ar no cilindro, mais gasolina queimada, mais força: um 2.0 rende como um 3.5.',
+    (s) => `+${fmt(Math.max(0, s.boost), 2)} bar · coletor ${Math.round(s.map * 101.3)} kPa`],
+  turboShaft: ['Eixo do turbo', 'Liga a turbina ao compressor e gira flutuando em óleo do motor. Por isso não se desliga um turbo logo depois de andar forte: o óleo parado cozinha no eixo quente.'],
+  intercooler: ['Intercooler', 'Comprimir o ar esquenta o ar. Este radiador esfria o ar antes de ele entrar no motor: ar frio é mais denso e detona menos.'],
+  wastegate: ['Wastegate', 'Uma portinhola que desvia parte do gás por fora da turbina. Quando a pressão chega ao valor desejado ela abre, e a turbina para de acelerar. É ela que define a pressão do turbo.',
+    (s, P) => `alvo ${fmt(P.boost, 2)} bar · agora ${fmt(Math.max(0, s.boost), 2)} bar`],
+  bov: ['Válvula de alívio', 'Ao tirar o pé, a borboleta fecha e o ar comprimido fica sem saída. Esta válvula abre e o solta: é o "pshhh" dos carros turbo.'],
+  intake: ['Tubo de pressão', 'Leva o ar comprimido do compressor, pelo intercooler, até o motor. A cor mostra a pressão: laranja e vermelho são o turbo trabalhando.', (s) => `${Math.round(s.map * 101.3)} kPa`],
+  header: ['Coletor de escape', 'Junta o gás dos 4 cilindros e o joga na turbina. A cor mostra a temperatura.', (s) => `${Math.round(s.temp.egt)} °C`],
+  exhaustSys: ['Escape 4 em 1 com turbina', 'Os 4 tubos se juntam logo na saída do cabeçote e o gás passa pela turbina, que rouba parte da energia e alisa os pulsos. Por isso um motor turbo soa mais abafado e grave.'],
+};
+const DEF_T4 = ['Como usar', 'Ligue a chave (I) e segure a partida (Enter). Acelere com ↑ ou Espaço e veja o turbo encher. Para andar: embreagem (C), 1ª (E) e solte a embreagem acelerando. Deixe o carro parado e observe a água esquentar, a termostática abrir e a ventoinha ligar. Clique em qualquer peça.'];
+
+const T_B6 = {
+  piston: ['Pistões opostos', 'Cada pistão tem um par do outro lado, que faz o movimento espelhado: os dois saem e voltam ao mesmo tempo. As forças se anulam e o motor quase não vibra, sem precisar de eixos balanceadores.'],
+  rod: ['Biela', 'No boxer cada biela tem o próprio moente, a 180° do moente do pistão oposto. É isso que o diferencia de um V a 180°, em que dois pistões dividem o mesmo moente.'],
+  crank: ['Virabrequim', 'Curto e rígido, com 6 moentes e 7 mancais. Como o motor é deitado, ele fica bem baixo no carro, e o centro de gravidade também.', (s) => `${fmtInt(s.rpm)} rpm`],
+  cylinder: ['Cilindro', 'São 6, deitados: 3 de cada lado, com 97 mm de diâmetro e 78 mm de curso. Clique num cilindro para ver a pressão dele no painel.'],
+  head: ['Cabeçotes', 'Dois cabeçotes, um em cada ponta, cada um com 2 comandos e 12 válvulas. O motor fica largo e baixo.'],
+  crankcase: ['Cárter', 'O bloco é dividido ao meio, na vertical, e abraça o virabrequim.'],
+  exhaustSys: ['Escape 3 em 1 de cada lado', 'Cada bancada tem o próprio coletor. As explosões de uma bancada vêm a cada 240°, igualmente espaçadas: é daí o uivo liso e metálico do seis cilindros boxer.'],
+};
+const DEF_B6 = ['Como usar', 'Ligue a chave (I) e segure a partida (Enter). Acelere com ↑ ou Espaço e ouça o seis cilindros subir até 7.500 rpm. Para andar: embreagem (C), 1ª (E) e solte a embreagem acelerando. Parado, observe a água esquentar e a ventoinha ligar. Clique em qualquer peça.'];
+
+const T_RX = {
+  rotor: ['Rotor', 'Um triângulo de lados abaulados que faz o papel do pistão. Cada um dos três lados forma uma câmara com a parede, e as três fazem o ciclo ao mesmo tempo, defasadas: sempre há uma em admissão, uma comprimindo ou queimando e uma em escape.',
+    (s) => `rotor ${fmtInt(s.rpm / 3)} rpm · eixo ${fmtInt(s.rpm)} rpm`],
+  housing: ['Carcaça', 'A parede em forma de 8 gordo (uma epitrocoide). As pontas do rotor nunca saem dela. Admissão e escape são simples janelas na parede: não há válvulas, comandos nem molas.'],
+  chamber: ['Câmara', 'O espaço entre um lado do rotor e a carcaça. Ele cresce (admissão), encolhe (compressão), cresce de novo (explosão) e encolhe (escape) enquanto o rotor dá uma volta. A cor mostra a pressão.'],
+  apex: ['Vedações de ápice', 'Lâminas nas três pontas do rotor, que raspam a carcaça e separam as câmaras, como os anéis de um pistão. São o ponto fraco do Wankel: gastam, e o motor perde compressão.'],
+  eshaft: ['Eixo excêntrico', 'É o "virabrequim" do Wankel. O rotor gira em volta de um ressalto fora de centro (a linha amarela) e o empurra em círculo. O eixo dá 3 voltas para cada volta do rotor, e por isso o motor gira tão alto e tão liso.',
+    (s) => `${fmtInt(s.rpm)} rpm`],
+  statGear: ['Engrenagem fixa', 'Presa na carcaça, não gira. A engrenagem interna do rotor rola em volta dela, e é isso que obriga o rotor a girar no ritmo certo, 1 volta para cada 3 do eixo.'],
+  rotorGear: ['Engrenagem do rotor', 'Dentes por dentro do rotor, que rolam em volta da engrenagem fixa.'],
+  spark: ['Velas (duas por rotor)', 'A câmara do Wankel é comprida e fina, e a queima é lenta. Duas velas, uma depois da outra, ajudam a queimar tudo. Mesmo assim sobra gasolina sem queimar: o rotativo gasta mais e solta fogo pelo escape.',
+    (s) => `avanço ${fmt(s.adv, 0)}°`],
+  coolant: ['Água na carcaça', 'A carcaça esquenta sempre no mesmo lugar (o lado das velas, onde acontece a queima) e fica fria no lado da admissão. A água corre por dentro da parede para igualar. Um rotativo superaquecido empena a carcaça e está perdido.',
+    (s) => `motor ${Math.round(s.temp.coolant)} °C · radiador ${Math.round(s.temp.rad)} °C`],
+  intake: ['Janela de admissão', 'Um buraco na carcaça. O rotor passa, destampa a janela e a câmara, crescendo, puxa a mistura. A cor mostra a pressão.', (s) => `${Math.round(s.map * 101.3)} kPa`],
+  header: ['Janela de escape', 'Quando a ponta do rotor passa por ela, o gás ainda em alta pressão sai de uma vez. Sem válvula para segurar, o escape do Wankel é muito quente e muito barulhento.', (s) => `${Math.round(s.temp.egt)} °C`],
+  exhaustSys: ['Escapamento', 'Um tubo por rotor. Cada rotor explode uma vez por volta do eixo, então 2 rotores soam no ritmo de um 4 cilindros, só que com pulsos mais secos: o zumbido agudo típico do rotativo.'],
+};
+const DEF_RX = ['Como usar', 'Ligue a chave (I) e segure a partida (Enter). Acelere com ↑ ou Espaço: o Wankel sobe liso até 9.000 rpm. Clique no rotor pequeno para trocar de rotor. Para andar: embreagem (C), 1ª (E) e solte a embreagem acelerando. Em Parâmetros, experimente a janela ampliada. Clique em qualquer peça.'];
+const CAR_T = { t4: [T_T4, DEF_T4], b6: [T_B6, DEF_B6], rx: [T_RX, DEF_RX] };
+
 const DEFAULT = ['Como usar', 'Ligue a chave (I), espere a bomba de combustível escorvar e segure a partida (Enter). Acelere com ↑ ou Espaço. Para andar: embreagem (C), engate a 1ª (Q) e solte a embreagem acelerando. Clique em qualquer peça para saber o que ela faz.'];
 
 export class Info {
@@ -137,7 +233,9 @@ export class Info {
     st = st || this.st;
     const v2 = P && P.engine === 'v2';
     const cg = P && P.engine === 'cg';
-    const [h, p, live] = (cg ? T3[this.sel] : null) || (v2 ? T2[this.sel] : null) || T[this.sel] || (cg ? DEFAULT3 : v2 ? DEFAULT2 : DEFAULT);
+    const car = P && CAR_T[P.engine];
+    const [h, p, live] = car ? (car[0][this.sel] || TC[this.sel] || car[1])
+      : (cg ? T3[this.sel] : null) || (v2 ? T2[this.sel] : null) || T[this.sel] || (cg ? DEFAULT3 : v2 ? DEFAULT2 : DEFAULT);
     let lv = live && st ? live(st, P) : '';
     if (!this.sel && st && st.msg && st.msgT > 0) lv = st.msg;
     if (!force && lv === this.lastLive) return;

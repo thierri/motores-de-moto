@@ -1,11 +1,14 @@
 import { DEFAULTS_BY, ENGINES, MODES } from './config.js';
-import { createState, step, shift, kick } from './sim/engine.js';
+import { createState, step, shift, kick, RPM } from './sim/engine.js';
 import { Scene } from './render/scene.js';
 import { Panel } from './render/panel.js';
 import { Controls } from './ui/controls.js';
 import { Info } from './ui/info.js';
 import { Params } from './ui/params.js';
 import { Sound } from './audio/sound.js';
+import { Presentation } from './present/presentation.js';
+import { View3D } from './render3d/view3d.js';
+import { SCENES } from './present/scenes.js';
 
 const qs = new URLSearchParams(location.search);
 const VIDEO = qs.has('video') || window.__VIDEO_MODE === true;
@@ -20,11 +23,23 @@ function mulberry32(a) {
   };
 }
 
+// seletor de motores: duas abas (motos e carros), três motores em cada
+const ENG_BTNS = {
+  moto: [['cg', 'street', 'CG125'], ['v2', 'cruiser', 'Harley Davidson'], ['i4', 'sport', 'BMW S1000']],
+  car: [['t4', 'hatch', '4 cil. turbo'], ['b6', 'roadster', 'Boxer 6'], ['rx', 'coupe', 'Wankel']],
+};
+const QUERY = { v2: 'v2', harley: 'v2', i4: 'i4', bmw: 'i4', s1000: 'i4', cg: 'cg', t4: 't4', turbo: 't4', b6: 'b6', boxer: 'b6', rx: 'rx', wankel: 'rx' };
+const allPs = () => Object.fromEntries(Object.keys(ENGINES).map((k) => [k, clone(DEFAULTS_BY[k])]));
+
 const ICON = {
   // silhuetas das motos (traço, cor do texto)
   sport: '<svg class="mi" viewBox="0 0 52 28"><circle cx="11" cy="21" r="6"/><circle cx="41" cy="21" r="6"/><path d="M11 21 L19 13 L28 12 L35 9 L46 13 L41 21 M19 13 L16 9 L23 7 L30 9 M35 9 L40 6 L44 7 M28 12 L33 18 L41 21"/></svg>',
   cruiser: '<svg class="mi" viewBox="0 0 52 28"><circle cx="10" cy="21" r="6"/><circle cx="43" cy="21" r="6"/><path d="M10 21 L17 15 L26 16 L29 13 L36 12 L43 21 M36 12 L33 4 L29 4 M17 15 L13 12 L21 11 M26 16 L30 21 L38 21"/></svg>',
   street: '<svg class="mi" viewBox="0 0 52 28"><circle cx="11" cy="21" r="5.5"/><circle cx="41" cy="21" r="5.5"/><path d="M11 21 L18 14 L29 13 L37 9 L41 21 M18 14 L15 11 L23 10 M23 10 Q28 7 32 10 M37 9 L35 5 L31 5 M29 13 L31 19 L41 21"/><circle cx="39" cy="9" r="1.8"/></svg>',
+  // silhuetas dos carros
+  hatch: '<svg class="mi" viewBox="0 0 52 28"><circle cx="13" cy="21" r="4.5"/><circle cx="39" cy="21" r="4.5"/><path d="M8.5 21 H3 V15 L8 13 L15 6 H32 L42 13 L49 15 V21 H43.5 M17.5 21 H34.5 M12 13 H40"/></svg>',
+  roadster: '<svg class="mi" viewBox="0 0 52 28"><circle cx="12" cy="21" r="4.5"/><circle cx="40" cy="21" r="4.5"/><path d="M7.5 21 H2 V17 Q4 14 12 13 L20 9 Q26 7 31 10 L36 13 Q47 14 50 17 V21 H44.5 M16.5 21 H35.5"/></svg>',
+  coupe: '<svg class="mi" viewBox="0 0 52 28"><circle cx="12" cy="21" r="4.5"/><circle cx="40" cy="21" r="4.5"/><path d="M7.5 21 H2 V16 L10 13 Q18 6 27 6 Q36 6 43 13 L50 15 V21 H44.5 M16.5 21 H35.5 M14 13 H41"/></svg>',
   snd: '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
   mute: '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="m17 9 5 6M22 9l-5 6"/></svg>',
   gear: '<svg viewBox="0 0 24 24"><path d="M10.3 2h3.4l.5 2.6 2 .9 2.2-1.5 2.4 2.4-1.5 2.2.9 2 2.6.5v3.4l-2.6.5-.9 2 1.5 2.2-2.4 2.4-2.2-1.5-2 .9-.5 2.6h-3.4l-.5-2.6-2-.9-2.2 1.5-2.4-2.4 1.5-2.2-.9-2L2 13.7v-3.4l2.6-.5.9-2L4 5.6 6.4 3.2l2.2 1.5 2-.9z" fill="currentColor" fill-rule="evenodd"/><circle cx="12" cy="12" r="3.2" fill="#141f2b"/></svg>',
@@ -36,14 +51,15 @@ class App {
     this.stage = document.getElementById('stage');
     if (VIDEO) this.stage.classList.add('video');
     const q = qs.get('motor');
-    this.Ps = { i4: clone(DEFAULTS_BY.i4), v2: clone(DEFAULTS_BY.v2), cg: clone(DEFAULTS_BY.cg) };
-    this.P = this.Ps[q === 'v2' || q === 'harley' ? 'v2' : q === 'i4' || q === 'bmw' || q === 's1000' ? 'i4' : 'cg'];
+    this.Ps = allPs();
+    this.P = this.Ps[QUERY[q] || (q === 'carros' ? 't4' : 'cg')];
+    this.last = { moto: 'cg', car: 't4' };   // último motor usado em cada aba
     this.st = createState(this.P);
     this.acc = 0;
-    this.pres = { active: false };
 
     this.buildTopbar();
     this.scene = new Scene(document.getElementById('scene'), document.getElementById('overlay'));
+    this.view3d = new View3D(document.getElementById('sceneWrap'), this);
     this.panel = new Panel(document.getElementById('panel'));
     this.controls = new Controls(document.getElementById('controls'), this);
     this.info = new Info(document.getElementById('info'), document.getElementById('infoCard'));
@@ -57,7 +73,7 @@ class App {
       if (!e.target.closest('[data-comp]') && !e.target.closest('[data-cyl]')) { this.info.show(null, this.st, this.P); this.scene.setSel(null); }
     });
 
-    const fq = qs.get('fmt');
+    const fq = qs.get('fmt') || window.__VIDEO_FMT;
     this.forcedFmt = fq === '916' ? 'f916' : fq === '169' ? 'f169' : null;
     document.getElementById('sceneTabs').addEventListener('click', (e) => {
       const b = e.target.closest('button');
@@ -71,6 +87,7 @@ class App {
     this.info.show(null, this.st, this.P);
     this.params.sync();
     window.addEventListener('resize', () => this.layout());
+    this.pres = new Presentation(this, SCENES);
 
     if (!VIDEO) {
       const gate = document.getElementById('audioGate');
@@ -90,6 +107,8 @@ class App {
         requestAnimationFrame(loop);
       };
       requestAnimationFrame(loop);
+      // ?apresentacao (ou ?apresentacao=N): roda o roteiro do vídeo a partir da cena N
+      if (qs.has('apresentacao')) this.pres.start(+qs.get('apresentacao') || 0);
     }
     this.onSceneStart = (i) => { if (VIDEO) Math.random = mulberry32(1000 + i); };
   }
@@ -97,12 +116,11 @@ class App {
   buildTopbar() {
     const tb = document.getElementById('topbar');
     tb.innerHTML = `
-      <div class="brand"><b id="brandT"></b><span id="brandS"></span></div>
-      <div class="engsel" id="engSel" data-spot="engine">
-        <button data-v="cg">${ICON.street}<span>CG125</span></button>
-        <button data-v="v2">${ICON.cruiser}<span>Harley Davidson</span></button>
-        <button data-v="i4">${ICON.sport}<span>BMW S1000</span></button>
+      <div class="bwrap">
+        <div class="brand"><b id="brandT"></b><span id="brandS"></span></div>
+        <div class="catsel" id="catSel"><button data-c="moto">Motos</button><button data-c="car">Carros</button></div>
       </div>
+      <div class="engsel" id="engSel" data-spot="engine"></div>
       <div class="sp"></div>
       <div class="legend">
         <span>pressão / temperatura</span><i class="grad"></i><span class="lo">baixa</span><span class="hi">alta</span>
@@ -117,6 +135,7 @@ class App {
     });
     $('#vol').addEventListener('input', (e) => (this.sound.volume = +e.target.value));
     $('#engSel').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) this.setEngine(b.dataset.v); });
+    $('#catSel').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) this.setCategory(b.dataset.c); });
     $('#btnParams').addEventListener('click', () => this.showDrawer(!document.getElementById('drawer').classList.contains('open')));
   }
 
@@ -136,9 +155,9 @@ class App {
   }
 
   buildTabs() {
-    const v2 = this.P.engine === 'v2';
     const eng = this.P.engine;
-    const tabs = [['motor', { i4: '4 cilindros', v2: 'V-Twin', cg: 'CG 125' }[eng]], ['dentro', { i4: 'Por dentro', v2: 'Ritmo', cg: 'Carburador' }[eng]], ['escape', 'Escape']];
+    const tabs = [['motor', { i4: '4 cilindros', v2: 'V-Twin', cg: 'CG 125', t4: 'Motor e turbo', b6: 'Boxer 6', rx: 'Wankel' }[eng]],
+      ['dentro', { i4: 'Por dentro', v2: 'Ritmo', cg: 'Carburador' }[eng] || 'Arrefecimento'], ['escape', 'Escape']];
     const box = document.getElementById('sceneTabs');
     const cur = this.scene.tab || 'motor';
     box.innerHTML = tabs.map(([k, n]) => `<button data-v="${k}" class="${k === cur ? 'on' : ''}">${n}</button>`).join('');
@@ -167,8 +186,18 @@ class App {
     this.resetFx();
     this.syncBrand();
   }
+  // aba Motos / Carros: volta para o último motor usado naquela aba
+  get cat() { return ENGINES[this.P.engine].car ? 'car' : 'moto'; }
+  setCategory(c) { if (c !== this.cat && ENG_BTNS[c]) this.setEngine(this.last[c]); }
   syncBrand() {
-    const E = ENGINES[this.P.engine];
+    const E = ENGINES[this.P.engine], cat = this.cat;
+    this.last[cat] = this.P.engine;
+    if (this.catShown !== cat) {
+      this.catShown = cat;
+      document.getElementById('engSel').innerHTML = ENG_BTNS[cat].map(([k, ic, n]) => `<button data-v="${k}">${ICON[ic]}<span>${n}</span></button>`).join('');
+      document.querySelectorAll('#catSel button').forEach((b) => b.classList.toggle('on', b.dataset.c === cat));
+      this.stage.classList.toggle('car', cat === 'car');
+    }
     document.getElementById('brandT').innerHTML = E.title;
     document.getElementById('brandS').textContent = E.sub;
     document.querySelectorAll('#engSel button').forEach((b) => b.classList.toggle('on', b.dataset.v === this.P.engine));
@@ -181,7 +210,10 @@ class App {
     this.st.key = on;
     if (on) document.getElementById('btnKey')?.classList.remove('hint');   // já achou a chave: para de piscar
   }
-  setRun(on) { this.st.run = on; }
+  setRun(on) { if (!ENGINES[this.P.engine].car) this.st.run = on; }
+  // carros: ar-condicionado (pesa no motor e liga a ventoinha) e ar quente (ajuda a esfriar o motor)
+  setAc(on) { if (ENGINES[this.P.engine].car) this.st.ac = on; }
+  setHeater(on) { if (ENGINES[this.P.engine].car) this.st.heater = on; }
   shift(dir) { shift(this.st, this.P, dir); }
   kick() { kick(this.st, this.P); }
   setChoke(on) { if (ENGINES[this.P.engine].carb) this.st.choke = on; }
@@ -190,12 +222,45 @@ class App {
   setListen(v) { this.sound.listen = v; this.sound.applyListen(); }
 
   reset(prep = {}) {
-    const keep = { key: this.st.key, wasKey: this.st.key, primed: this.st.key, run: true };
+    const keep = { key: this.st.key, wasKey: this.st.key, primed: this.st.key, run: true, ac: this.st.ac, heater: this.st.heater };
     this.st = createState(this.P, { ...keep, ...prep });
     this.acc = 0;
     this.params.sync();
     this.resetFx();
   }
+  // ---------- roteiro (modo apresentação / vídeo) ----------
+  // começa a cena do zero: todos os motores com os valores padrão e o estado pedido
+  prepScene(p = {}) {
+    this.Ps = allPs();
+    const eng = p.engine || 'cg';
+    Object.assign(this.Ps[eng], p.P || {});
+    this.P = this.Ps[eng];
+    this.st = this.makeState(p);
+    this.controls.setLock(false);
+    this.controls.user.grip = 0;
+    this.scene.setCyl(0);
+    this.scene.tab = p.tab || 'motor';
+    this.syncBrand();
+    this.params.sync();
+    this.resetFx();
+  }
+  makeState(p) {
+    const key = p.key ?? !!p.running;
+    const o = { key, wasKey: key, primed: key, run: true, choke: !!p.choke, gear: p.gear || 0, forceP: p.forceP ?? null };
+    if (p.running) { const r = p.rpm || this.P.idle; Object.assign(o, { running: true, omega: r / RPM, rpm: r }); }
+    if (p.warm ?? p.running) o.temp = ENGINES[this.P.engine].car ? { coolant: 90, oil: 88, egt: 420, amb: this.P.amb, rad: 72 } : { coolant: 82, oil: 80, egt: 420, amb: 25 };
+    return createState(this.P, o);
+  }
+  // troca de motor no meio da cena, já funcionando (o resto da cena continua)
+  hot(engine, p = {}) {
+    this.P = this.Ps[engine];
+    this.st = this.makeState({ running: true, ...p });
+    this.scene.setCyl(0);
+    this.syncBrand();
+    this.params.sync();
+    this.resetFx();
+  }
+
   defaults() { this.Ps[this.P.engine] = clone(DEFAULTS_BY[this.P.engine]); this.P = this.Ps[this.P.engine]; this.reset(); }
 
   resetFx() {
@@ -218,6 +283,7 @@ class App {
       while (this.acc >= PHYS_DT) { step(this.st, this.P, PHYS_DT); this.acc -= PHYS_DT; }
     }
     this.scene.update(this.st, this.P, dt);
+    this.view3d.update(this.st, this.P, dt);
     this.panel.update(this.st, this.P, dt, this.scene.cyl);
     this.controls.render(this.st, this.P);
     this.info.render(this.st, this.P);
@@ -235,6 +301,7 @@ window.sim = {
   get params() { return app.P; },
   scene: app.scene, panel: app.panel, controls: app.controls, sound: app.sound,
   get pres() { return app.pres; },
+  get app() { return app; },
   reset: (...a) => app.reset(...a),
   tick: (dt, sdt) => app.tick(dt, sdt),
   resetFx: () => app.resetFx(),

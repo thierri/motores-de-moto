@@ -1,4 +1,4 @@
-// Roteiro de testes da física, sem navegador: node tools/testsim.mjs [i4|v2]
+// Roteiro de testes da física, sem navegador: node tools/testsim.mjs [i4|v2|cg|t4|b6|rx]
 import { DEFAULTS_BY, ENGINES } from '../js/config.js';
 import { createState, step, shift, wotCurve, cv, kick } from '../js/sim/engine.js';
 
@@ -10,13 +10,13 @@ function test(key) {
   const P = { ...DEFAULTS_BY[key] };
   const st = createState(P);
   const run = (sec, fn) => { for (let t = 0; t < sec; t += DT) { if (fn) fn(t); step(st, P, DT); } };
-  const show = (lbl) => console.log(`${lbl.padEnd(30)} rpm${f(st.rpm)} pr${f(st.pr, 2)} T${f(st.Tb, 1)} cv${f(cv(st.kw), 0)} v${f(st.v * 3.6, 0)}km/h g${st.gear} λ${f(st.lambda, 2)} adv${f(st.adv, 1)} knock${f(st.knock, 2)} Tc${f(st.temp.coolant, 0)} egt${f(st.temp.egt, 0)} ${st.cut.any ? 'CUT' : ''} ${st.msg && st.msgT > 0 ? '| ' + st.msg : ''}`);
+  const show = (lbl) => console.log(`${lbl.padEnd(30)} rpm${f(st.rpm)} pr${f(st.pr, 2)} T${f(st.Tb, 1)} cv${f(cv(st.kw), 0)} v${f(st.v * 3.6, 0)}km/h g${st.gear} λ${f(st.lambda, 2)} adv${f(st.adv, 1)} knock${f(st.knock, 2)} Tc${f(st.temp.coolant, 0)}${E.car ? ` rad${f(st.temp.rad, 0)} fan${st.fan ? 1 : 0} b${f(st.boost, 2)}` : ''} egt${f(st.temp.egt, 0)} ${st.cut.any ? 'CUT' : ''} ${st.msg && st.msgT > 0 ? '| ' + st.msg : ''}`);
 
   console.log(`\n================ ${E.name} ================`);
   const c = wotCurve(P);
   let pk = c[0], tk = c[0];
   for (const p of c) { if (p.kw > pk.kw) pk = p; if (p.T > tk.T) tk = p; }
-  const pts = key === 'cg' ? [2000, 4000, 6000, 6500, 8000, 8500, 9500] : key === 'v2' ? [1000, 2000, 3000, 3250, 4000, 5000, 5500] : [2000, 4000, 6000, 8000, 10000, 11000, 12000, 13000, 14600];
+  const pts = E.car ? [1000, 1500, 2000, 3000, 4000, 5000, 6000, E.limit] : key === 'cg' ? [2000, 4000, 6000, 6500, 8000, 8500, 9500] : key === 'v2' ? [1000, 2000, 3000, 3250, 4000, 5000, 5500] : [2000, 4000, 6000, 8000, 10000, 11000, 12000, 13000, 14600];
   console.log(pts.map((r) => { const p = c.reduce((a, b) => (Math.abs(b.rpm - r) < Math.abs(a.rpm - r) ? b : a)); return `${p.rpm}: ${p.T.toFixed(0)} Nm ${cv(p.kw).toFixed(0)} cv`; }).join(' · '));
   console.log(`pico: ${cv(pk.kw).toFixed(0)} cv a ${pk.rpm} · ${tk.T.toFixed(1)} Nm a ${tk.rpm}`);
 
@@ -73,4 +73,4 @@ function test(key) {
 }
 
 const which = process.argv[2];
-for (const k of which ? [which] : ['i4', 'v2', 'cg']) test(k);
+for (const k of which ? [which] : Object.keys(ENGINES)) test(k);
